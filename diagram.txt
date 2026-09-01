@@ -1,0 +1,32 @@
+                 HTTPS Request
+Client (curl)
+     │
+     ▼
+localhost
+     │
+     ▼
+Name Resolution
+     │
+     ▼
+127.0.0.1 / ::1
+     │
+     ▼
+TCP :9443
+     │
+     ▼
+TLS 1.3
+     │
+     ▼
+HTTP/2
+     │
+     ▼
+Go HTTP Server
+     │
+     ▼
+/health Handler
+     │
+     ▼
+HTTP/2 200
+     │
+     ▼
+{"status":"ok"}
