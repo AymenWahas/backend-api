@@ -68,3 +68,50 @@ HTTP Status:
 
 Content-Type:
 application/json
+
+\\\\\\\\\\\\\\\\\\\\\\\\\\\
+ayman-wahas@ayman-wahas:~/backend-api$ curl -vk https://localhost:9443/health
+* Host localhost:9443 was resolved.
+* IPv6: ::1
+* IPv4: 127.0.0.1
+*   Trying [::1]:9443...
+* Connected to localhost (::1) port 9443
+* ALPN: curl offers h2,http/1.1
+* TLSv1.3 (OUT), TLS handshake, Client hello (1):
+* TLSv1.3 (IN), TLS handshake, Server hello (2):
+* TLSv1.3 (IN), TLS handshake, Encrypted Extensions (8):
+* TLSv1.3 (IN), TLS handshake, Certificate (11):
+* TLSv1.3 (IN), TLS handshake, CERT verify (15):
+* TLSv1.3 (IN), TLS handshake, Finished (20):
+* TLSv1.3 (OUT), TLS change cipher, Change cipher spec (1):
+* TLSv1.3 (OUT), TLS handshake, Finished (20):
+* SSL connection using TLSv1.3 / TLS_AES_128_GCM_SHA256 / X25519 / RSASSA-PSS
+* ALPN: server accepted h2
+* Server certificate:
+*  subject: CN=localhost
+*  start date: Sep  1 14:41:38 2026 GMT
+*  expire date: Sep  1 14:41:38 2027 GMT
+*  issuer: CN=localhost
+*  SSL certificate verify result: self-signed certificate (18), continuing anyway.
+*   Certificate level 0: Public key type RSA (2048/112 Bits/secBits), signed using sha256WithRSAEncryption
+* TLSv1.3 (IN), TLS handshake, Newsession Ticket (4):
+* using HTTP/2
+* [HTTP/2] [1] OPENED stream for https://localhost:9443/health
+* [HTTP/2] [1] [:method: GET]
+* [HTTP/2] [1] [:scheme: https]
+* [HTTP/2] [1] [:authority: localhost:9443]
+* [HTTP/2] [1] [:path: /health]
+* [HTTP/2] [1] [user-agent: curl/8.5.0]
+* [HTTP/2] [1] [accept: */*]
+> GET /health HTTP/2
+> Host: localhost:9443
+> User-Agent: curl/8.5.0
+> Accept: */*
+> 
+< HTTP/2 200 
+< content-type: application/json
+< content-length: 16
+< date: Tue, 01 Sep 2026 19:29:12 GMT
+< 
+{"status":"ok"}
+* Connection #0 to host localhost left intact
