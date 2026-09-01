@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log/slog"
 	"net/http"
 	"os"
 )
@@ -17,7 +18,7 @@ func main() {
 
 	addr := ":" + port
 
-	fmt.Println("HTTPS server running on", addr)
+	slog.Info("HTTPS server starting", "addr", addr)
 
 	err := http.ListenAndServeTLS(
 		addr,
@@ -27,13 +28,21 @@ func main() {
 	)
 
 	if err != nil {
-		fmt.Println("Server error:", err)
+
+		slog.Error("server failed", "error", err)
 	}
-	fmt.Println("Hello Backend")
-	fmt.Println("Hello Backend 3")
+
 }
 
 func healthHandler(w http.ResponseWriter, r *http.Request) {
+	slog.Info(
+		"request received",
+		"method", r.Method,
+		"path", r.URL.Path,
+	)
+
 	w.Header().Set("Content-Type", "application/json")
+
 	fmt.Fprintln(w, `{"status":"ok"}`)
+
 }
