@@ -29,6 +29,8 @@ func main() {
 	if err != nil {
 		fmt.Println("Server error:", err)
 	}
+	fmt.Println("Hello Backend")
+	fmt.Println("Hello Backend 2")
 }
 
 func healthHandler(w http.ResponseWriter, r *http.Request) {
