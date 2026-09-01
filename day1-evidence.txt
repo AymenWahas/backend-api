@@ -1,0 +1,70 @@
+Request-flow diagram
+                 HTTPS Request
+Client (curl)
+     │
+     ▼
+localhost
+     │
+     ▼
+Name Resolution
+     │
+     ▼
+127.0.0.1 / ::1
+     │
+     ▼
+TCP :9443
+     │
+     ▼
+TLS 1.3
+     │
+     ▼
+HTTP/2
+     │
+     ▼
+Go HTTP Server
+     │
+     ▼
+/health Handler
+     │
+     ▼
+HTTP/2 200
+     │
+     ▼
+{"status":"ok"}
+
+\\\\\\\\\\\\\\\\\\\\\\
+2-Repository Structure
+\\\\\\\\\\\\\\\\\\\\\\\
+
+ayman-wahas@ayman-wahas:~/backend-api$ tree
+.
+├── backend-api
+├── certs
+│   ├── cert.pem
+│   └── key.pem
+├── day1-evidence.txt
+├── diagram.txt
+├── go.mod
+└── main.go
+2 directories, 7 files
+
+\\\\\\\\\\\\\\
+3- Build Command
+\\\\\\\\\\\\\\\\
+ayman-wahas@ayman-wahas:~/backend-api$ ls -lh backend-api
+-rwxrwxr-x 1 ayman-wahas ayman-wahas 8.9M Sep  1 21:44 backend-api
+
+\\\\\\\\\\\\\
+4-and/health respone
+\\\\\\\\\\\\\\\\
+Endpoint:
+GET /health
+
+Response:
+{"status":"ok"}
+
+HTTP Status:
+200 OK
+
+Content-Type:
+application/json
