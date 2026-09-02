@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"backend-api/internal/delivery/http/dto"
 	"backend-api/internal/delivery/http/response"
@@ -90,7 +91,34 @@ func (h *Handler) CreateEmployee(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) GetEmployees(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
+	filter := repository.EmployeeFilter{
+		Name:  query.Get("name"),
+		Email: query.Get("email"),
+	}
+	sortParam := query.Get("sort")
 
+	sortBy := repository.EmployeeSort{
+		Field: "id",
+	}
+
+	if strings.HasPrefix(sortParam, "-") {
+		sortBy.Desc = true
+		sortBy.Field = strings.TrimPrefix(sortParam, "-")
+	} else if sortParam != "" {
+		sortBy.Field = sortParam
+	}
+	if sortBy.Field != "id" &&
+		sortBy.Field != "name" &&
+		sortBy.Field != "email" {
+
+		response.WriteError(
+			w,
+			http.StatusBadRequest,
+			"INVALID_SORT",
+			"sort must be id, name, or email",
+		)
+		return
+	}
 	page := 1
 	pageSize := 10
 
@@ -127,6 +155,8 @@ func (h *Handler) GetEmployees(w http.ResponseWriter, r *http.Request) {
 	offset := (page - 1) * pageSize
 
 	employees, total, version, err := h.usecase.GetEmployees(
+		filter,
+		sortBy,
 		offset,
 		pageSize,
 	)
@@ -141,12 +171,15 @@ func (h *Handler) GetEmployees(w http.ResponseWriter, r *http.Request) {
 	}
 
 	etag := fmt.Sprintf(
-		`"employees-%d-page-%d-size-%d"`,
+		`"employees-%d-page-%d-size-%d-name-%s-email-%s-sort-%s-desc-%t"`,
 		version,
 		page,
 		pageSize,
+		filter.Name,
+		filter.Email,
+		sortBy.Field,
+		sortBy.Desc,
 	)
-
 	w.Header().Set("ETag", etag)
 
 	if r.Header.Get("If-None-Match") == etag {

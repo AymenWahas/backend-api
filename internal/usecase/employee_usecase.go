@@ -35,10 +35,11 @@ func (u *EmployeeUsecase) GetEmployee(id int) (domain.Employee, error) {
 	return u.repo.GetByID(id)
 }
 
-func (u *EmployeeUsecase) GetEmployees(offset, limit int) (
+func (u *EmployeeUsecase) GetEmployees(filter repository.EmployeeFilter,
+	sortBy repository.EmployeeSort, offset, limit int) (
 
 	[]domain.Employee, int, uint64, error) {
-	return u.repo.GetAll(offset, limit)
+	return u.repo.GetAll(filter, sortBy, offset, limit)
 }
 
 func (u *EmployeeUsecase) UpdateEmployee(employee domain.Employee) (domain.Employee, error) {

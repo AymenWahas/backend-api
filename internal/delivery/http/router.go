@@ -3,34 +3,57 @@ package http
 import (
 	"net/http"
 
+	swaggerui "github.com/swaggest/swgui/v5"
+
 	"backend-api/internal/delivery/http/handler"
 	"backend-api/internal/delivery/http/middleware"
 )
 
 func NewRouter(h *handler.Handler) http.Handler {
-	mux := http.NewServeMux()
+	// API routes
+	apiMux := http.NewServeMux()
 
-	mux.HandleFunc("GET /health", h.Health)
+	apiMux.HandleFunc("GET /health", h.Health)
 
-	mux.Handle(
+	apiMux.Handle(
 		"POST /api/v1/employees",
 		middleware.JSONContentType(
 			http.HandlerFunc(h.CreateEmployee),
 		),
 	)
 
-	mux.HandleFunc("GET /api/v1/employees", h.GetEmployees)
+	apiMux.HandleFunc("GET /api/v1/employees", h.GetEmployees)
 
-	mux.HandleFunc("GET /api/v1/employees/{id}", h.GetEmployee)
+	apiMux.HandleFunc("GET /api/v1/employees/{id}", h.GetEmployee)
 
-	mux.Handle(
+	apiMux.Handle(
 		"PUT /api/v1/employees/{id}",
 		middleware.JSONContentType(
 			http.HandlerFunc(h.UpdateEmployee),
 		),
 	)
 
-	mux.HandleFunc("DELETE /api/v1/employees/{id}", h.DeleteEmployee)
+	apiMux.HandleFunc("DELETE /api/v1/employees/{id}", h.DeleteEmployee)
 
-	return middleware.AcceptJSON(mux)
+	// Main router
+	mux := http.NewServeMux()
+
+	// API goes through AcceptJSON
+	mux.Handle("/", middleware.AcceptJSON(apiMux))
+
+	// OpenAPI specification
+	mux.HandleFunc("GET /openapi.json", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "docs/openapi.json")
+	})
+
+	// Swagger UI
+	swaggerHandler := swaggerui.New(
+		"Employee API",
+		"/openapi.json",
+		"/swagger/",
+	)
+
+	mux.Handle("/swagger/", swaggerHandler)
+
+	return mux
 }

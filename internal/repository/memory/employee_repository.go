@@ -2,6 +2,7 @@ package memory
 
 import (
 	"sort"
+	"strings"
 	"sync"
 
 	"backend-api/internal/domain"
@@ -45,8 +46,9 @@ func (r *EmployeeRepository) GetByID(id int) (domain.Employee, error) {
 
 	return employee, nil
 }
-
 func (r *EmployeeRepository) GetAll(
+	filter repository.EmployeeFilter,
+	sortBy repository.EmployeeSort,
 	offset, limit int,
 ) ([]domain.Employee, int, uint64, error) {
 	r.mu.RLock()
@@ -55,10 +57,54 @@ func (r *EmployeeRepository) GetAll(
 	employees := make([]domain.Employee, 0, len(r.employees))
 
 	for _, employee := range r.employees {
+
+		if filter.Name != "" &&
+			!strings.Contains(
+				strings.ToLower(employee.Name),
+				strings.ToLower(filter.Name),
+			) {
+			continue
+		}
+
+		if filter.Email != "" &&
+			!strings.Contains(
+				strings.ToLower(employee.Email),
+				strings.ToLower(filter.Email),
+			) {
+			continue
+		}
+
 		employees = append(employees, employee)
 	}
 	sort.Slice(employees, func(i, j int) bool {
-		return employees[i].ID < employees[j].ID
+		var less bool
+		var greater bool
+
+		switch sortBy.Field {
+		case "name":
+			left := strings.ToLower(employees[i].Name)
+			right := strings.ToLower(employees[j].Name)
+
+			less = left < right
+			greater = left > right
+
+		case "email":
+			left := strings.ToLower(employees[i].Email)
+			right := strings.ToLower(employees[j].Email)
+
+			less = left < right
+			greater = left > right
+
+		default:
+			less = employees[i].ID < employees[j].ID
+			greater = employees[i].ID > employees[j].ID
+		}
+
+		if sortBy.Desc {
+			return greater
+		}
+
+		return less
 	})
 	total := len(employees)
 
@@ -67,6 +113,7 @@ func (r *EmployeeRepository) GetAll(
 	}
 
 	end := offset + limit
+
 	if end > total {
 		end = total
 	}
