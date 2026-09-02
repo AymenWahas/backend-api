@@ -1,0 +1,53 @@
+1. OpenAPI-first document
+
+docs/openapi.yaml
+docs/openapi.json
+GET    /api/v1/employees
+POST   /api/v1/employees
+GET    /api/v1/employees/{id}
+PUT    /api/v1/employees/{id}
+DELETE /api/v1/employees/{id}
+GET    /health
+
+\\\\\\\\\\\\\\\\
+2. Covering projects and tasks
+\\\\\\\\\\\\\\\\\\\\\\\
+Day 2 Task	      Evidence
+REST API	             /api/v1/employees
+HTTP Methods	GET/POST/PUT/DELETE
+Status Codes	200/201/204/400/404/406/415
+JSON Contract	docs/openapi.yaml
+Validation	Handler/DTO
+Pagination	page, page_size
+Filtering	            name, email
+Sorting	            sort_by, sort_order
+ETag	                Handler/response
+PostgreSQL	    employee_db
+Connection Pool	   database/postgres.go
+Swagger	           /swagger/
+OpenAPI      	docs/openapi.yaml
+
+
+#######################
+3 Success and Error explanation
+############################
+POST /api/v1/employees POST /api/v1/employees
+
+
+response: وال
+
+{
+  "id": 2,
+  "name": "aymen wahas",
+  "email": "aymenwahas@example.com"
+}
+
+
+Error  معنا حقيقي  
+NOT_ACCEPTABLE
+{
+  "error": {
+    "code": "NOT_ACCEPTABLE",
+    "message": "only application/json is supported"
+  }
+}
