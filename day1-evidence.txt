@@ -51,9 +51,18 @@ ayman-wahas@ayman-wahas:~/backend-api$ tree
 \\\\\\\\\\\\\\
 3- Build Command
 \\\\\\\\\\\\\\\\
+Build Command:
+go build
+
+Result:
+Build completed successfully.
+
+Generated binary:
+backend-api
+Size:
+8.9M
 ayman-wahas@ayman-wahas:~/backend-api$ ls -lh backend-api
 -rwxrwxr-x 1 ayman-wahas ayman-wahas 8.9M Sep  1 21:44 backend-api
-
 \\\\\\\\\\\\\
 4-and/health respone
 \\\\\\\\\\\\\\\\
