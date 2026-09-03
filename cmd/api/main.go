@@ -3,48 +3,65 @@ package main
 import (
 	"log/slog"
 	"net/http"
-	"time"
+	"os"
+	_ "time"
 
 	"backend-api/internal/config"
 	"backend-api/internal/database"
 	httpdelivery "backend-api/internal/delivery/http"
 	"backend-api/internal/delivery/http/handler"
+	"backend-api/internal/repository/memory"
 	"backend-api/internal/repository/postgres"
 	"backend-api/internal/usecase"
 )
 
 func main() {
-	cfg := config.Load()
+	logger := slog.New(
+		slog.NewJSONHandler(
+			os.Stdout,
+			&slog.HandlerOptions{
+				Level: slog.LevelInfo,
+			},
+		),
+	)
+
+	slog.SetDefault(logger)
+
+	cfg, err := config.Load()
+
+	if err != nil {
+		slog.Error(
+			"configuration validation failed",
+			"error", err,
+		)
+
+		return
+	}
 
 	// Database
 	db, err := database.NewPostgres(cfg)
+
 	if err != nil {
-		slog.Error("database connection failed", "error", err)
+		slog.Error(
+			"database connection failed",
+			"error", err,
+		)
+
 		return
 	}
-	go func() {
-		for {
-			stats := database.Stats(db)
 
-			slog.Info(
-				"database pool",
-				"open", stats.OpenConnections,
-				"in_use", stats.InUse,
-				"idle", stats.Idle,
-			)
-
-			time.Sleep(10 * time.Second)
-		}
-	}()
 	// Repository
 	repo := postgres.NewEmployeeRepository(db)
 
-	// Usecase
-	uc := usecase.NewEmployeeUsecase(repo)
+	employeeUC := usecase.NewEmployeeUsecase(repo)
 
-	// HTTP Handler
-	h := handler.NewHandler(uc)
+	projectRepo := memory.NewProjectRepository()
+	projectUC := usecase.NewProjectUsecase(projectRepo)
 
+	taskRepo := memory.NewTaskRepository()
+	taskUC := usecase.NewTaskUsecase(taskRepo)
+
+	h := handler.NewHandler(employeeUC, projectUC, taskUC)
 	// Router
 	router := httpdelivery.NewRouter(h)
 

@@ -1,0 +1,25 @@
+@@@@@@@@@@
+panic test --logs with request
+##############
+ayman-wahas@ayman-wahas:~/backend-api$ go run ./cmd/api
+{"time":"2026-09-03T17:36:14.041633438+03:00","level":"INFO","msg":"HTTPS server starting","addr":":8443"}
+{"time":"2026-09-03T17:36:19.281830145+03:00","level":"ERROR","msg":"panic recovered","error":"test panic","method":"GET","path":"/panic-test","request_id":"6311a747-2e5d-44f2-a20d-4f2ffd09d373"}
+
+ayman-wahas@ayman-wahas:~/backend-api$ curl -k -i https://localhost:8443/panic-test
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+100    70  100    70    0     0   2063      0 --:--:-- --:--:-- --:--:--  2121
+
+
+ayman-wahas@ayman-wahas:~/backend-api$ go run ./cmd/api
+{"time":"2026-09-03T17:23:05.893859841+03:00","level":"INFO","msg":"HTTPS server starting","addr":":8443"}
+{"time":"2026-09-03T17:23:21.022326866+03:00","level":"INFO","msg":"request completed","method":"GET","path":"/api/v1/tasks","status":200,"duration":205175,"request_id":"d3338d14-7be7-4fc9-8151-f8a34f17dc05"}
+
+
+HTTP Handler
+     ↓
+Usecase
+     ↓
+Repository Interface
+     ↓
+Memory / PostgreSQL

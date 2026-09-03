@@ -8,7 +8,10 @@ require (
 	gorm.io/gorm v1.31.2
 )
 
-require github.com/swaggest/swgui v1.8.9
+require (
+	github.com/google/uuid v1.6.0
+	github.com/swaggest/swgui v1.8.9
+)
 
 require (
 	github.com/jackc/pgpassfile v1.0.0 // indirect

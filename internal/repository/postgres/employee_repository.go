@@ -127,8 +127,9 @@ func (r *EmployeeRepository) Update(
 		Model(&domain.Employee{}).
 		Where("id = ?", employee.ID).
 		Updates(map[string]interface{}{
-			"name":  employee.Name,
-			"email": employee.Email,
+			"name":       employee.Name,
+			"email":      employee.Email,
+			"department": employee.Department,
 		})
 
 	if result.Error != nil {

@@ -3,8 +3,9 @@ package dto
 import "strings"
 
 type CreateEmployeeRequest struct {
-	Name  string `json:"name"`
-	Email string `json:"email"`
+	Name       string  `json:"name"`
+	Email      string  `json:"email"`
+	Department *string `json:"department,omitempty"`
 }
 
 func (r CreateEmployeeRequest) Validate() bool {
@@ -13,8 +14,9 @@ func (r CreateEmployeeRequest) Validate() bool {
 }
 
 type UpdateEmployeeRequest struct {
-	Name  string `json:"name"`
-	Email string `json:"email"`
+	Name       string  `json:"name"`
+	Email      string  `json:"email"`
+	Department *string `json:"department,omitempty"`
 }
 
 func (r UpdateEmployeeRequest) Validate() bool {
@@ -23,7 +25,8 @@ func (r UpdateEmployeeRequest) Validate() bool {
 }
 
 type EmployeeResponse struct {
-	ID    int    `json:"id"`
-	Name  string `json:"name"`
-	Email string `json:"email"`
+	ID         int     `json:"id"`
+	Name       string  `json:"name"`
+	Email      string  `json:"email"`
+	Department *string `json:"department,omitempty"`
 }

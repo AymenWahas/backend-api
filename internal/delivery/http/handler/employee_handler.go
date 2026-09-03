@@ -16,15 +16,22 @@ import (
 )
 
 type Handler struct {
-	usecase *usecase.EmployeeUsecase
+	usecase        *usecase.EmployeeUsecase
+	projectHandler *ProjectHandler
+	taskHandler    *TaskHandler
 }
 
-func NewHandler(uc *usecase.EmployeeUsecase) *Handler {
+func NewHandler(
+	employeeUC *usecase.EmployeeUsecase,
+	projectUC *usecase.ProjectUsecase,
+	taskUC *usecase.TaskUsecase,
+) *Handler {
 	return &Handler{
-		usecase: uc,
+		usecase:        employeeUC,
+		projectHandler: NewProjectHandler(projectUC),
+		taskHandler:    NewTaskHandler(taskUC),
 	}
 }
-
 func (h *Handler) Health(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, http.StatusOK, map[string]string{
 		"status": "ok",
@@ -55,8 +62,9 @@ func (h *Handler) CreateEmployee(w http.ResponseWriter, r *http.Request) {
 	}
 
 	employee := domain.Employee{
-		Name:  req.Name,
-		Email: req.Email,
+		Name:       req.Name,
+		Email:      req.Email,
+		Department: req.Department,
 	}
 
 	created, err := h.usecase.CreateEmployee(employee)
@@ -81,9 +89,10 @@ func (h *Handler) CreateEmployee(w http.ResponseWriter, r *http.Request) {
 	}
 
 	res := dto.EmployeeResponse{
-		ID:    created.ID,
-		Name:  created.Name,
-		Email: created.Email,
+		ID:         created.ID,
+		Name:       created.Name,
+		Email:      created.Email,
+		Department: req.Department,
 	}
 
 	response.WriteJSON(w, http.StatusCreated, res)
@@ -191,9 +200,10 @@ func (h *Handler) GetEmployees(w http.ResponseWriter, r *http.Request) {
 
 	for _, employee := range employees {
 		data = append(data, dto.EmployeeResponse{
-			ID:    employee.ID,
-			Name:  employee.Name,
-			Email: employee.Email,
+			ID:         employee.ID,
+			Name:       employee.Name,
+			Email:      employee.Email,
+			Department: employee.Department,
 		})
 	}
 
@@ -275,9 +285,10 @@ func (h *Handler) UpdateEmployee(w http.ResponseWriter, r *http.Request) {
 	}
 
 	employee := domain.Employee{
-		ID:    id,
-		Name:  req.Name,
-		Email: req.Email,
+		ID:         id,
+		Name:       req.Name,
+		Email:      req.Email,
+		Department: req.Department,
 	}
 
 	updated, err := h.usecase.UpdateEmployee(employee)
@@ -312,9 +323,10 @@ func (h *Handler) UpdateEmployee(w http.ResponseWriter, r *http.Request) {
 	}
 
 	res := dto.EmployeeResponse{
-		ID:    updated.ID,
-		Name:  updated.Name,
-		Email: updated.Email,
+		ID:         updated.ID,
+		Name:       updated.Name,
+		Email:      updated.Email,
+		Department: updated.Department,
 	}
 
 	response.WriteJSON(w, http.StatusOK, res)
@@ -355,3 +367,44 @@ func (h *Handler) DeleteEmployee(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusNoContent)
 }
+func (h *Handler) CreateProject(w http.ResponseWriter, r *http.Request) {
+	h.projectHandler.Create(w, r)
+}
+
+func (h *Handler) GetProjects(w http.ResponseWriter, r *http.Request) {
+	h.projectHandler.GetAll(w, r)
+}
+
+func (h *Handler) GetProject(w http.ResponseWriter, r *http.Request) {
+	h.projectHandler.GetByID(w, r)
+}
+
+func (h *Handler) UpdateProject(w http.ResponseWriter, r *http.Request) {
+	h.projectHandler.Update(w, r)
+}
+
+func (h *Handler) DeleteProject(w http.ResponseWriter, r *http.Request) {
+	h.projectHandler.Delete(w, r)
+}
+
+func (h *Handler) CreateTask(w http.ResponseWriter, r *http.Request) {
+	h.taskHandler.Create(w, r)
+}
+func (h *Handler) GetTasks(w http.ResponseWriter, r *http.Request) {
+	h.taskHandler.GetAll(w, r)
+}
+func (h *Handler) GetTask(w http.ResponseWriter, r *http.Request) {
+	h.taskHandler.GetByID(w, r)
+}
+func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request) {
+	h.taskHandler.Update(w, r)
+}
+func (h *Handler) DeleteTask(w http.ResponseWriter, r *http.Request) {
+	h.taskHandler.Delete(w, r)
+}
+
+
+
+//func (h *Handler) PanicTest(w http.ResponseWriter, r *http.Request) {
+//	panic("test panic")
+//}
