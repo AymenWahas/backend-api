@@ -4,13 +4,11 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
-	_ "time"
 
 	"backend-api/internal/config"
 	"backend-api/internal/database"
 	httpdelivery "backend-api/internal/delivery/http"
 	"backend-api/internal/delivery/http/handler"
-	"backend-api/internal/repository/memory"
 	"backend-api/internal/repository/postgres"
 	"backend-api/internal/usecase"
 )
@@ -52,13 +50,12 @@ func main() {
 
 	// Repository
 	repo := postgres.NewEmployeeRepository(db)
-
 	employeeUC := usecase.NewEmployeeUsecase(repo)
 
-	projectRepo := memory.NewProjectRepository()
+	projectRepo := postgres.NewProjectRepository(db)
 	projectUC := usecase.NewProjectUsecase(projectRepo)
 
-	taskRepo := memory.NewTaskRepository()
+	taskRepo := postgres.NewTaskRepository(db)
 	taskUC := usecase.NewTaskUsecase(taskRepo)
 
 	h := handler.NewHandler(employeeUC, projectUC, taskUC)

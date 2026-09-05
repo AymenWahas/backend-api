@@ -9,7 +9,6 @@ import (
 	"backend-api/internal/delivery/http/dto"
 	"backend-api/internal/delivery/http/response"
 	"backend-api/internal/domain"
-	"backend-api/internal/repository/memory"
 	"backend-api/internal/usecase"
 )
 
@@ -95,7 +94,7 @@ func (h *TaskHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 
 	task, err := h.usecase.GetByID(r.Context(), uint(id))
 	if err != nil {
-		if errors.Is(err, memory.ErrTaskNotFound) {
+		if errors.Is(err, domain.ErrTaskNotFound) {
 			response.WriteError(
 				w,
 				http.StatusNotFound,
@@ -159,7 +158,7 @@ func (h *TaskHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.usecase.Update(r.Context(), task); err != nil {
-		if errors.Is(err, memory.ErrTaskNotFound) {
+		if errors.Is(err, domain.ErrTaskNotFound) {
 			response.WriteError(
 				w,
 				http.StatusNotFound,
@@ -194,7 +193,7 @@ func (h *TaskHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.usecase.Delete(r.Context(), uint(id)); err != nil {
-		if errors.Is(err, memory.ErrTaskNotFound) {
+		if errors.Is(err, domain.ErrTaskNotFound) {
 			response.WriteError(
 				w,
 				http.StatusNotFound,

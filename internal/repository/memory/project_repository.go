@@ -2,13 +2,10 @@ package memory
 
 import (
 	"context"
-	"errors"
 	"sync"
 
 	"backend-api/internal/domain"
 )
-
-var ErrProjectNotFound = errors.New("project not found")
 
 type ProjectRepository struct {
 	mu       sync.RWMutex
@@ -23,7 +20,10 @@ func NewProjectRepository() *ProjectRepository {
 	}
 }
 
-func (r *ProjectRepository) Create(ctx context.Context, project *domain.Project) error {
+func (r *ProjectRepository) Create(
+	ctx context.Context,
+	project *domain.Project,
+) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -39,7 +39,10 @@ func (r *ProjectRepository) Create(ctx context.Context, project *domain.Project)
 	return nil
 }
 
-func (r *ProjectRepository) GetByID(ctx context.Context, id uint) (*domain.Project, error) {
+func (r *ProjectRepository) GetByID(
+	ctx context.Context,
+	id uint,
+) (*domain.Project, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -49,14 +52,17 @@ func (r *ProjectRepository) GetByID(ctx context.Context, id uint) (*domain.Proje
 
 	project, ok := r.projects[id]
 	if !ok {
-		return nil, ErrProjectNotFound
+		return nil, domain.ErrProjectNotFound
 	}
 
 	result := project
+
 	return &result, nil
 }
 
-func (r *ProjectRepository) GetAll(ctx context.Context) ([]domain.Project, error) {
+func (r *ProjectRepository) GetAll(
+	ctx context.Context,
+) ([]domain.Project, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -73,7 +79,10 @@ func (r *ProjectRepository) GetAll(ctx context.Context) ([]domain.Project, error
 	return projects, nil
 }
 
-func (r *ProjectRepository) Update(ctx context.Context, project *domain.Project) error {
+func (r *ProjectRepository) Update(
+	ctx context.Context,
+	project *domain.Project,
+) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -82,7 +91,7 @@ func (r *ProjectRepository) Update(ctx context.Context, project *domain.Project)
 	defer r.mu.Unlock()
 
 	if _, ok := r.projects[project.ID]; !ok {
-		return ErrProjectNotFound
+		return domain.ErrProjectNotFound
 	}
 
 	r.projects[project.ID] = *project
@@ -90,7 +99,10 @@ func (r *ProjectRepository) Update(ctx context.Context, project *domain.Project)
 	return nil
 }
 
-func (r *ProjectRepository) Delete(ctx context.Context, id uint) error {
+func (r *ProjectRepository) Delete(
+	ctx context.Context,
+	id uint,
+) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -99,7 +111,7 @@ func (r *ProjectRepository) Delete(ctx context.Context, id uint) error {
 	defer r.mu.Unlock()
 
 	if _, ok := r.projects[id]; !ok {
-		return ErrProjectNotFound
+		return domain.ErrProjectNotFound
 	}
 
 	delete(r.projects, id)

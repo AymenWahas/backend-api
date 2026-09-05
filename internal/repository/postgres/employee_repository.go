@@ -45,7 +45,7 @@ func (r *EmployeeRepository) GetByID(
 		First(&employee)
 
 	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-		return domain.Employee{}, repository.ErrEmployeeNotFound
+		return domain.Employee{}, domain.ErrEmployeeNotFound
 	}
 
 	if result.Error != nil {
@@ -137,7 +137,7 @@ func (r *EmployeeRepository) Update(
 	}
 
 	if result.RowsAffected == 0 {
-		return domain.Employee{}, repository.ErrEmployeeNotFound
+		return domain.Employee{}, domain.ErrEmployeeNotFound
 	}
 
 	return r.GetByID(employee.ID)
@@ -154,7 +154,7 @@ func (r *EmployeeRepository) Delete(id int) error {
 	}
 
 	if result.RowsAffected == 0 {
-		return repository.ErrEmployeeNotFound
+		return domain.ErrEmployeeNotFound
 	}
 
 	return nil

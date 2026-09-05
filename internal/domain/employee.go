@@ -1,8 +1,8 @@
 package domain
 
 type Employee struct {
-	ID         int     `json:"id"`
-	Name       string  `json:"name"`
-	Email      string  `json:"email"`
+	ID         int     `gorm:"primaryKey" json:"id"`
+	Name       string  `gorm:"not null" json:"name"`
+	Email      string  `gorm:"unique;not null" json:"email"`
 	Department *string `json:"department,omitempty"`
 }

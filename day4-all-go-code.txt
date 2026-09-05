@@ -1,0 +1,2862 @@
+
+============================================================
+FILE: ./internal/usecase/employee_usecase.go
+============================================================
+package usecase
+
+import (
+	"errors"
+	"strings"
+
+	"backend-api/internal/domain"
+	"backend-api/internal/repository"
+)
+
+var ErrInvalidEmployee = errors.New("invalid employee")
+
+type EmployeeUsecase struct {
+	repo repository.EmployeeRepository
+}
+
+func NewEmployeeUsecase(repo repository.EmployeeRepository) *EmployeeUsecase {
+	return &EmployeeUsecase{
+		repo: repo,
+	}
+}
+
+func (u *EmployeeUsecase) CreateEmployee(employee domain.Employee) (domain.Employee, error) {
+	employee.Name = strings.TrimSpace(employee.Name)
+	employee.Email = strings.TrimSpace(employee.Email)
+
+	if employee.Name == "" || employee.Email == "" {
+		return domain.Employee{}, ErrInvalidEmployee
+	}
+
+	return u.repo.Create(employee)
+}
+
+func (u *EmployeeUsecase) GetEmployee(id int) (domain.Employee, error) {
+	return u.repo.GetByID(id)
+}
+
+func (u *EmployeeUsecase) GetEmployees(filter repository.EmployeeFilter,
+	sortBy repository.EmployeeSort, offset, limit int) (
+
+	[]domain.Employee, int, uint64, error) {
+	return u.repo.GetAll(filter, sortBy, offset, limit)
+}
+
+func (u *EmployeeUsecase) UpdateEmployee(employee domain.Employee) (domain.Employee, error) {
+	employee.Name = strings.TrimSpace(employee.Name)
+	employee.Email = strings.TrimSpace(employee.Email)
+
+	if employee.ID <= 0 {
+		return domain.Employee{}, ErrInvalidEmployee
+	}
+
+	if employee.Name == "" || employee.Email == "" {
+		return domain.Employee{}, ErrInvalidEmployee
+	}
+
+	return u.repo.Update(employee)
+}
+
+func (u *EmployeeUsecase) DeleteEmployee(id int) error {
+	return u.repo.Delete(id)
+}
+
+
+============================================================
+FILE: ./internal/usecase/employee_usecase_test.go
+============================================================
+package usecase
+
+import (
+	"errors"
+	"testing"
+
+	"backend-api/internal/domain"
+	"backend-api/internal/repository"
+)
+
+type fakeEmployeeRepository struct {
+	createdEmployee domain.Employee
+	createCalled    bool
+	createErr       error
+}
+
+func (f *fakeEmployeeRepository) Create(
+	employee domain.Employee,
+) (domain.Employee, error) {
+	f.createCalled = true
+	f.createdEmployee = employee
+
+	if f.createErr != nil {
+		return domain.Employee{}, f.createErr
+	}
+
+	return employee, nil
+}
+
+func (f *fakeEmployeeRepository) GetByID(
+	id int,
+) (domain.Employee, error) {
+	return domain.Employee{}, nil
+}
+
+func (f *fakeEmployeeRepository) GetAll(
+	filter repository.EmployeeFilter,
+	sortBy repository.EmployeeSort,
+	offset, limit int,
+) ([]domain.Employee, int, uint64, error) {
+	return nil, 0, 0, nil
+}
+
+func (f *fakeEmployeeRepository) Update(
+	employee domain.Employee,
+) (domain.Employee, error) {
+	return employee, nil
+}
+
+func (f *fakeEmployeeRepository) Delete(id int) error {
+	return nil
+}
+
+func TestCreateEmployee(t *testing.T) {
+	repositoryError := errors.New("repository error")
+
+	tests := []struct {
+		name          string
+		employee      domain.Employee
+		repositoryErr error
+		wantName      string
+		wantEmail     string
+		wantErr       error
+		wantCreate    bool
+	}{
+		{
+			name: "valid employee trims spaces",
+			employee: domain.Employee{
+				Name:  "  Ali  ",
+				Email: "  ali@example.com  ",
+			},
+			wantName:   "Ali",
+			wantEmail:  "ali@example.com",
+			wantCreate: true,
+		},
+		{
+			name: "empty name",
+			employee: domain.Employee{
+				Name:  "   ",
+				Email: "ali@example.com",
+			},
+			wantErr:    ErrInvalidEmployee,
+			wantCreate: false,
+		},
+		{
+			name: "empty email",
+			employee: domain.Employee{
+				Name:  "Ali",
+				Email: "   ",
+			},
+			wantErr:    ErrInvalidEmployee,
+			wantCreate: false,
+		},
+		{
+			name: "repository error",
+			employee: domain.Employee{
+				Name:  "Ali",
+				Email: "ali@example.com",
+			},
+			repositoryErr: repositoryError,
+			wantErr:       repositoryError,
+			wantCreate:    true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo := &fakeEmployeeRepository{
+				createErr: tt.repositoryErr,
+			}
+
+			uc := NewEmployeeUsecase(repo)
+
+			got, err := uc.CreateEmployee(tt.employee)
+
+			if !errors.Is(err, tt.wantErr) {
+				t.Fatalf(
+					"expected error %v, got %v",
+					tt.wantErr,
+					err,
+				)
+			}
+
+			if tt.wantErr != nil {
+				if repo.createCalled != tt.wantCreate {
+					t.Fatalf(
+						"expected Create called = %v, got %v",
+						tt.wantCreate,
+						repo.createCalled,
+					)
+				}
+
+				return
+			}
+
+			if got.Name != tt.wantName {
+				t.Errorf(
+					"expected name %q, got %q",
+					tt.wantName,
+					got.Name,
+				)
+			}
+
+			if got.Email != tt.wantEmail {
+				t.Errorf(
+					"expected email %q, got %q",
+					tt.wantEmail,
+					got.Email,
+				)
+			}
+
+			if repo.createCalled != tt.wantCreate {
+				t.Errorf(
+					"expected Create called = %v, got %v",
+					tt.wantCreate,
+					repo.createCalled,
+				)
+			}
+		})
+	}
+}
+
+
+============================================================
+FILE: ./internal/usecase/project_usecase.go
+============================================================
+package usecase
+
+import (
+	"context"
+
+	"backend-api/internal/domain"
+	"backend-api/internal/repository"
+)
+
+type ProjectUsecase struct {
+	repo repository.ProjectRepository
+}
+
+func NewProjectUsecase(repo repository.ProjectRepository) *ProjectUsecase {
+	return &ProjectUsecase{
+		repo: repo,
+	}
+}
+
+func (u *ProjectUsecase) Create(
+	ctx context.Context,
+	project *domain.Project,
+) error {
+	return u.repo.Create(ctx, project)
+}
+
+func (u *ProjectUsecase) GetByID(
+	ctx context.Context,
+	id uint,
+) (*domain.Project, error) {
+	return u.repo.GetByID(ctx, id)
+}
+
+func (u *ProjectUsecase) GetAll(
+	ctx context.Context,
+) ([]domain.Project, error) {
+	return u.repo.GetAll(ctx)
+}
+
+func (u *ProjectUsecase) Update(
+	ctx context.Context,
+	project *domain.Project,
+) error {
+	return u.repo.Update(ctx, project)
+}
+
+func (u *ProjectUsecase) Delete(
+	ctx context.Context,
+	id uint,
+) error {
+	return u.repo.Delete(ctx, id)
+}
+
+
+============================================================
+FILE: ./internal/usecase/task_usecase.go
+============================================================
+package usecase
+
+import (
+	"context"
+
+	"backend-api/internal/domain"
+	"backend-api/internal/repository"
+)
+
+type TaskUsecase struct {
+	repo repository.TaskRepository
+}
+
+func NewTaskUsecase(repo repository.TaskRepository) *TaskUsecase {
+	return &TaskUsecase{
+		repo: repo,
+	}
+}
+
+func (u *TaskUsecase) Create(
+	ctx context.Context,
+	task *domain.Task,
+) error {
+	return u.repo.Create(ctx, task)
+}
+
+func (u *TaskUsecase) GetByID(
+	ctx context.Context,
+	id uint,
+) (*domain.Task, error) {
+	return u.repo.GetByID(ctx, id)
+}
+
+func (u *TaskUsecase) GetAll(
+	ctx context.Context,
+) ([]domain.Task, error) {
+	return u.repo.GetAll(ctx)
+}
+
+func (u *TaskUsecase) Update(
+	ctx context.Context,
+	task *domain.Task,
+) error {
+	return u.repo.Update(ctx, task)
+}
+
+func (u *TaskUsecase) Delete(
+	ctx context.Context,
+	id uint,
+) error {
+	return u.repo.Delete(ctx, id)
+}
+
+
+============================================================
+FILE: ./internal/delivery/http/middleware/timeout.go
+============================================================
+package middleware
+
+import (
+	"context"
+	"net/http"
+	"time"
+)
+
+func Timeout(duration time.Duration) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			ctx, cancel := context.WithTimeout(r.Context(), duration)
+			defer cancel()
+
+			r = r.WithContext(ctx)
+
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+
+============================================================
+FILE: ./internal/delivery/http/middleware/content_type.go
+============================================================
+package middleware
+
+import (
+	"net/http"
+	"strings"
+
+	"backend-api/internal/delivery/http/response"
+)
+
+func JSONContentType(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		contentType := r.Header.Get("Content-Type")
+
+		if contentType == "" ||
+			!strings.HasPrefix(contentType, "application/json") {
+
+			response.WriteError(
+				w,
+				http.StatusUnsupportedMediaType,
+				"UNSUPPORTED_MEDIA_TYPE",
+				"Content-Type must be application/json",
+			)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
+}
+
+
+============================================================
+FILE: ./internal/delivery/http/middleware/recovery.go
+============================================================
+package middleware
+
+import (
+	"log/slog"
+	"net/http"
+
+	"backend-api/internal/delivery/http/response"
+)
+
+func Recovery(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer func() {
+			if err := recover(); err != nil {
+				slog.Error(
+					"panic recovered",
+					"error", err,
+					"method", r.Method,
+					"path", r.URL.Path,
+					"request_id", GetRequestID(r.Context()),
+				)
+
+				response.WriteError(
+					w,
+					http.StatusInternalServerError,
+					"INTERNAL_ERROR",
+					"internal server error",
+				)
+			}
+		}()
+
+		next.ServeHTTP(w, r)
+	})
+}
+
+
+============================================================
+FILE: ./internal/delivery/http/middleware/accept.go
+============================================================
+package middleware
+
+import (
+	"net/http"
+	"strings"
+)
+
+func AcceptJSON(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		accept := r.Header.Get("Accept")
+
+		if accept != "" &&
+			accept != "*/*" &&
+			!strings.Contains(accept, "application/json") {
+
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusNotAcceptable)
+
+			w.Write([]byte(`{
+				"error": {
+					"code": "NOT_ACCEPTABLE",
+					"message": "only application/json is supported"
+				}
+			}`))
+
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
+}
+
+
+============================================================
+FILE: ./internal/delivery/http/middleware/request_id.go
+============================================================
+package middleware
+
+import (
+	"context"
+	"net/http"
+
+	"github.com/google/uuid"
+)
+
+type contextKey string
+
+const RequestIDKey contextKey = "request_id"
+
+func RequestID(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestID := r.Header.Get("X-Request-ID")
+
+		if requestID == "" {
+			requestID = uuid.NewString()
+		}
+
+		ctx := context.WithValue(
+			r.Context(),
+			RequestIDKey,
+			requestID,
+		)
+
+		w.Header().Set("X-Request-ID", requestID)
+
+		next.ServeHTTP(
+			w,
+			r.WithContext(ctx),
+		)
+	})
+}
+
+func GetRequestID(ctx context.Context) string {
+	requestID, _ := ctx.Value(RequestIDKey).(string)
+	return requestID
+}
+
+
+============================================================
+FILE: ./internal/delivery/http/middleware/request_logger.go
+============================================================
+package middleware
+
+import (
+	"log/slog"
+	"net/http"
+	"time"
+)
+
+type statusRecorder struct {
+	http.ResponseWriter
+	status int
+}
+
+func (sr *statusRecorder) WriteHeader(status int) {
+	sr.status = status
+	sr.ResponseWriter.WriteHeader(status)
+}
+
+func (sr *statusRecorder) Write(body []byte) (int, error) {
+	if sr.status == 0 {
+		sr.status = http.StatusOK
+	}
+
+	return sr.ResponseWriter.Write(body)
+}
+
+func RequestLogger(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+
+		recorder := &statusRecorder{
+			ResponseWriter: w,
+		}
+
+		next.ServeHTTP(recorder, r)
+
+		duration := time.Since(start)
+
+		slog.Info(
+			"request completed",
+			"method", r.Method,
+			"path", r.URL.Path,
+			"status", recorder.status,
+			"duration", duration,
+			"request_id", GetRequestID(r.Context()),
+		)
+	})
+}
+
+
+============================================================
+FILE: ./internal/delivery/http/handler/employee_handler.go
+============================================================
+package handler
+
+import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"net/http"
+	"strconv"
+	"strings"
+
+	"backend-api/internal/delivery/http/dto"
+	"backend-api/internal/delivery/http/response"
+	"backend-api/internal/domain"
+	"backend-api/internal/repository"
+	"backend-api/internal/usecase"
+)
+
+type Handler struct {
+	usecase        *usecase.EmployeeUsecase
+	projectHandler *ProjectHandler
+	taskHandler    *TaskHandler
+}
+
+func NewHandler(
+	employeeUC *usecase.EmployeeUsecase,
+	projectUC *usecase.ProjectUsecase,
+	taskUC *usecase.TaskUsecase,
+) *Handler {
+	return &Handler{
+		usecase:        employeeUC,
+		projectHandler: NewProjectHandler(projectUC),
+		taskHandler:    NewTaskHandler(taskUC),
+	}
+}
+func (h *Handler) Health(w http.ResponseWriter, r *http.Request) {
+	response.WriteJSON(w, http.StatusOK, map[string]string{
+		"status": "ok",
+	})
+}
+
+func (h *Handler) CreateEmployee(w http.ResponseWriter, r *http.Request) {
+	var req dto.CreateEmployeeRequest
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		response.WriteError(
+			w,
+			http.StatusBadRequest,
+			"INVALID_JSON",
+			"invalid JSON body",
+		)
+		return
+	}
+
+	if !req.Validate() {
+		response.WriteError(
+			w,
+			http.StatusBadRequest,
+			"INVALID_EMPLOYEE",
+			"name and email are required",
+		)
+		return
+	}
+	//dto to domain
+	employee := domain.Employee{
+		Name:       req.Name,
+		Email:      req.Email,
+		Department: req.Department,
+	}
+	//call usecase to create employee
+	created, err := h.usecase.CreateEmployee(employee)
+	if err != nil {
+		if errors.Is(err, usecase.ErrInvalidEmployee) {
+			response.WriteError(
+				w,
+				http.StatusBadRequest,
+				"INVALID_EMPLOYEE",
+				"employee name and email are required",
+			)
+			return
+		}
+
+		response.WriteError(w, http.StatusInternalServerError,
+			"INTERNAL_ERROR",
+			"internal server error",
+		)
+		return
+	}
+	// domain to dto
+	res := dto.EmployeeResponse{
+		ID:         created.ID,
+		Name:       created.Name,
+		Email:      created.Email,
+		Department: req.Department,
+	}
+	//send response error if any other error occurs
+	response.WriteJSON(w, http.StatusCreated, res)
+}
+
+func (h *Handler) GetEmployees(w http.ResponseWriter, r *http.Request) {
+	query := r.URL.Query()
+	filter := repository.EmployeeFilter{
+		Name:  query.Get("name"),
+		Email: query.Get("email"),
+	}
+	//sort by id, name, email
+	sortParam := query.Get("sort")
+
+	sortBy := repository.EmployeeSort{
+		Field: "id",
+	}
+
+	if strings.HasPrefix(sortParam, "-") {
+		sortBy.Desc = true
+		sortBy.Field = strings.TrimPrefix(sortParam, "-")
+	} else if sortParam != "" {
+		sortBy.Field = sortParam
+	}
+	if sortBy.Field != "id" &&
+		sortBy.Field != "name" &&
+		sortBy.Field != "email" {
+
+		response.WriteError(
+			w,
+			http.StatusBadRequest,
+			"INVALID_SORT",
+			"sort must be id, name, or email",
+		)
+		return
+	}
+	//pagination
+	page := 1
+	pageSize := 10
+
+	if value := query.Get("page"); value != "" {
+		parsed, err := strconv.Atoi(value)
+		if err != nil || parsed < 1 {
+			response.WriteError(
+				w,
+				http.StatusBadRequest,
+				"INVALID_PAGE",
+				"page must be greater than 0",
+			)
+			return
+		}
+
+		page = parsed
+	}
+
+	if value := query.Get("page_size"); value != "" {
+		parsed, err := strconv.Atoi(value)
+		if err != nil || parsed < 1 || parsed > 100 {
+			response.WriteError(
+				w,
+				http.StatusBadRequest,
+				"INVALID_PAGE_SIZE",
+				"page_size must be between 1 and 100",
+			)
+			return
+		}
+
+		pageSize = parsed
+	}
+
+	offset := (page - 1) * pageSize
+
+	//call usecase to get employees with filter, sort and pagination
+	employees, total, version, err := h.usecase.GetEmployees(
+		filter,
+		sortBy,
+		offset,
+		pageSize,
+	)
+	if err != nil {
+		response.WriteError(
+			w,
+			http.StatusInternalServerError,
+			"INTERNAL_ERROR",
+			"internal server error",
+		)
+		return
+	}
+	//set etag header for caching
+	etag := fmt.Sprintf(
+		`"employees-%d-page-%d-size-%d-name-%s-email-%s-sort-%s-desc-%t"`,
+		version,
+		page,
+		pageSize,
+		filter.Name,
+		filter.Email,
+		sortBy.Field,
+		sortBy.Desc,
+	)
+	w.Header().Set("ETag", etag)
+	//check if the etag matches the request header, if so return 304 Not Modified
+	if r.Header.Get("If-None-Match") == etag {
+		w.WriteHeader(http.StatusNotModified)
+		return
+	}
+	//convert domain employees to dto employees
+	data := make([]dto.EmployeeResponse, 0, len(employees))
+
+	for _, employee := range employees {
+		data = append(data, dto.EmployeeResponse{
+			ID:         employee.ID,
+			Name:       employee.Name,
+			Email:      employee.Email,
+			Department: employee.Department,
+		})
+	}
+	//calculate total pages for pagination
+	totalPages := 0
+	if total > 0 {
+		totalPages = (total + pageSize - 1) / pageSize
+	}
+	//create response with data and pagination info
+	res := dto.EmployeeListResponse{
+		Data: data,
+		Pagination: dto.Pagination{
+			Page:       page,
+			PageSize:   pageSize,
+			Total:      total,
+			TotalPages: totalPages,
+		},
+	}
+
+	response.WriteJSON(w, http.StatusOK, res)
+}
+
+// GetEmployee handles the GET /employees/{id} endpoint.
+func (h *Handler) GetEmployee(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil || id <= 0 {
+		response.WriteError(
+			w,
+			http.StatusBadRequest,
+			"INVALID_ID",
+			"invalid employee id",
+		)
+		return
+	}
+	employee, err := h.usecase.GetEmployee(id)
+	if err != nil {
+		if errors.Is(err, repository.ErrEmployeeNotFound) {
+			response.WriteError(
+				w,
+				http.StatusNotFound,
+				"EMPLOYEE_NOT_FOUND",
+				"employee not found",
+			)
+			return
+		}
+
+		response.WriteError(
+			w,
+			http.StatusInternalServerError,
+			"INTERNAL_ERROR",
+			"internal server error",
+		)
+		return
+	}
+
+	response.WriteJSON(w, http.StatusOK, employee)
+}
+
+func (h *Handler) UpdateEmployee(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil || id <= 0 {
+		response.WriteError(
+			w,
+			http.StatusBadRequest,
+			"INVALID_ID",
+			"invalid employee id",
+		)
+		return
+	}
+
+	var req dto.UpdateEmployeeRequest
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		response.WriteError(
+			w,
+			http.StatusBadRequest,
+			"INVALID_JSON",
+			"invalid JSON body",
+		)
+		return
+	}
+
+	employee := domain.Employee{
+		ID:         id,
+		Name:       req.Name,
+		Email:      req.Email,
+		Department: req.Department,
+	}
+
+	updated, err := h.usecase.UpdateEmployee(employee)
+	if err != nil {
+		switch {
+		case errors.Is(err, usecase.ErrInvalidEmployee):
+			response.WriteError(
+				w,
+				http.StatusBadRequest,
+				"INVALID_EMPLOYEE",
+				"employee name and email are required",
+			)
+
+		case errors.Is(err, repository.ErrEmployeeNotFound):
+			response.WriteError(
+				w,
+				http.StatusNotFound,
+				"EMPLOYEE_NOT_FOUND",
+				"employee not found",
+			)
+
+		default:
+			response.WriteError(
+				w,
+				http.StatusInternalServerError,
+				"INTERNAL_ERROR",
+				"internal server error",
+			)
+		}
+
+		return
+	}
+
+	res := dto.EmployeeResponse{
+		ID:         updated.ID,
+		Name:       updated.Name,
+		Email:      updated.Email,
+		Department: updated.Department,
+	}
+
+	response.WriteJSON(w, http.StatusOK, res)
+}
+
+func (h *Handler) DeleteEmployee(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil || id <= 0 {
+		response.WriteError(
+			w,
+			http.StatusBadRequest,
+			"INVALID_ID",
+			"invalid employee id",
+		)
+		return
+	}
+
+	err = h.usecase.DeleteEmployee(id)
+	if err != nil {
+		if errors.Is(err, repository.ErrEmployeeNotFound) {
+			response.WriteError(
+				w,
+				http.StatusNotFound,
+				"EMPLOYEE_NOT_FOUND",
+				"employee not found",
+			)
+			return
+		}
+
+		response.WriteError(
+			w,
+			http.StatusInternalServerError,
+			"INTERNAL_ERROR",
+			"internal server error",
+		)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+func (h *Handler) CreateProject(w http.ResponseWriter, r *http.Request) {
+	h.projectHandler.Create(w, r)
+}
+
+func (h *Handler) GetProjects(w http.ResponseWriter, r *http.Request) {
+	h.projectHandler.GetAll(w, r)
+}
+
+func (h *Handler) GetProject(w http.ResponseWriter, r *http.Request) {
+	h.projectHandler.GetByID(w, r)
+}
+
+func (h *Handler) UpdateProject(w http.ResponseWriter, r *http.Request) {
+	h.projectHandler.Update(w, r)
+}
+
+func (h *Handler) DeleteProject(w http.ResponseWriter, r *http.Request) {
+	h.projectHandler.Delete(w, r)
+}
+
+func (h *Handler) CreateTask(w http.ResponseWriter, r *http.Request) {
+	h.taskHandler.Create(w, r)
+}
+func (h *Handler) GetTasks(w http.ResponseWriter, r *http.Request) {
+	h.taskHandler.GetAll(w, r)
+}
+func (h *Handler) GetTask(w http.ResponseWriter, r *http.Request) {
+	h.taskHandler.GetByID(w, r)
+}
+func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request) {
+	h.taskHandler.Update(w, r)
+}
+func (h *Handler) DeleteTask(w http.ResponseWriter, r *http.Request) {
+	h.taskHandler.Delete(w, r)
+}
+
+//func (h *Handler) PanicTest(w http.ResponseWriter, r *http.Request) {
+//	panic("test panic")
+//}
+
+
+============================================================
+FILE: ./internal/delivery/http/handler/task_handler.go
+============================================================
+package handler
+
+import (
+	"encoding/json"
+	"errors"
+	"net/http"
+	"strconv"
+
+	"backend-api/internal/delivery/http/dto"
+	"backend-api/internal/delivery/http/response"
+	"backend-api/internal/domain"
+	"backend-api/internal/usecase"
+)
+
+type TaskHandler struct {
+	usecase *usecase.TaskUsecase
+}
+
+func NewTaskHandler(uc *usecase.TaskUsecase) *TaskHandler {
+	return &TaskHandler{
+		usecase: uc,
+	}
+}
+
+func (h *TaskHandler) Create(w http.ResponseWriter, r *http.Request) {
+	var req dto.CreateTaskRequest
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		response.WriteError(
+			w,
+			http.StatusBadRequest,
+			"INVALID_JSON",
+			"invalid JSON body",
+		)
+		return
+	}
+
+	if req.Title == "" {
+		response.WriteError(
+			w,
+			http.StatusBadRequest,
+			"INVALID_TASK",
+			"task title is required",
+		)
+		return
+	}
+
+	task := &domain.Task{
+		ProjectID: req.ProjectID,
+		Title:     req.Title,
+		Status:    req.Status,
+	}
+
+	if err := h.usecase.Create(r.Context(), task); err != nil {
+		response.WriteError(
+			w,
+			http.StatusInternalServerError,
+			"INTERNAL_ERROR",
+			"internal server error",
+		)
+		return
+	}
+
+	response.WriteJSON(w, http.StatusCreated, task)
+}
+
+func (h *TaskHandler) GetAll(w http.ResponseWriter, r *http.Request) {
+	tasks, err := h.usecase.GetAll(r.Context())
+	if err != nil {
+		response.WriteError(
+			w,
+			http.StatusInternalServerError,
+			"INTERNAL_ERROR",
+			"internal server error",
+		)
+		return
+	}
+
+	response.WriteJSON(w, http.StatusOK, tasks)
+}
+
+func (h *TaskHandler) GetByID(w http.ResponseWriter, r *http.Request) {
+
+	id, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil || id <= 0 {
+		response.WriteError(
+			w,
+			http.StatusBadRequest,
+			"INVALID_ID",
+			"invalid task id",
+		)
+		return
+	}
+
+	task, err := h.usecase.GetByID(r.Context(), uint(id))
+	if err != nil {
+		if errors.Is(err, domain.ErrTaskNotFound) {
+			response.WriteError(
+				w,
+				http.StatusNotFound,
+				"TASK_NOT_FOUND",
+				"task not found",
+			)
+			return
+		}
+
+		response.WriteError(
+			w,
+			http.StatusInternalServerError,
+			"INTERNAL_ERROR",
+			"internal server error",
+		)
+		return
+	}
+
+	response.WriteJSON(w, http.StatusOK, task)
+}
+
+func (h *TaskHandler) Update(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil || id <= 0 {
+		response.WriteError(
+			w,
+			http.StatusBadRequest,
+			"INVALID_ID",
+			"invalid task id",
+		)
+		return
+	}
+
+	var req dto.UpdateTaskRequest
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		response.WriteError(
+			w,
+			http.StatusBadRequest,
+			"INVALID_JSON",
+			"invalid JSON body",
+		)
+		return
+	}
+
+	if req.Title == "" {
+		response.WriteError(
+			w,
+			http.StatusBadRequest,
+			"INVALID_TASK",
+			"task title is required",
+		)
+		return
+	}
+
+	task := &domain.Task{
+		ID:        uint(id),
+		ProjectID: req.ProjectID,
+		Title:     req.Title,
+		Status:    req.Status,
+	}
+
+	if err := h.usecase.Update(r.Context(), task); err != nil {
+		if errors.Is(err, domain.ErrTaskNotFound) {
+			response.WriteError(
+				w,
+				http.StatusNotFound,
+				"TASK_NOT_FOUND",
+				"task not found",
+			)
+			return
+		}
+
+		response.WriteError(
+			w,
+			http.StatusInternalServerError,
+			"INTERNAL_ERROR",
+			"internal server error",
+		)
+		return
+	}
+
+	response.WriteJSON(w, http.StatusOK, task)
+}
+
+func (h *TaskHandler) Delete(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil || id <= 0 {
+		response.WriteError(
+			w,
+			http.StatusBadRequest,
+			"INVALID_ID",
+			"invalid task id",
+		)
+		return
+	}
+
+	if err := h.usecase.Delete(r.Context(), uint(id)); err != nil {
+		if errors.Is(err, domain.ErrTaskNotFound) {
+			response.WriteError(
+				w,
+				http.StatusNotFound,
+				"TASK_NOT_FOUND",
+				"task not found",
+			)
+			return
+		}
+
+		response.WriteError(
+			w,
+			http.StatusInternalServerError,
+			"INTERNAL_ERROR",
+			"internal server error",
+		)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+
+============================================================
+FILE: ./internal/delivery/http/handler/project_handler.go
+============================================================
+package handler
+
+import (
+	"encoding/json"
+	"errors"
+	"net/http"
+	"strconv"
+
+	"backend-api/internal/delivery/http/dto"
+	"backend-api/internal/delivery/http/response"
+	"backend-api/internal/domain"
+	"backend-api/internal/usecase"
+)
+
+type ProjectHandler struct {
+	usecase *usecase.ProjectUsecase
+}
+
+func NewProjectHandler(uc *usecase.ProjectUsecase) *ProjectHandler {
+	return &ProjectHandler{
+		usecase: uc,
+	}
+}
+
+func (h *ProjectHandler) Create(w http.ResponseWriter, r *http.Request) {
+	var req dto.CreateProjectRequest
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		response.WriteError(
+			w,
+			http.StatusBadRequest,
+			"INVALID_JSON",
+			"invalid JSON body",
+		)
+		return
+	}
+
+	if req.Name == "" {
+		response.WriteError(
+			w,
+			http.StatusBadRequest,
+			"INVALID_PROJECT",
+			"project name is required",
+		)
+		return
+	}
+
+	project := &domain.Project{
+		Name:        req.Name,
+		Description: req.Description,
+	}
+
+	if err := h.usecase.Create(r.Context(), project); err != nil {
+		response.WriteError(
+			w,
+			http.StatusInternalServerError,
+			"INTERNAL_ERROR",
+			"internal server error",
+		)
+		return
+	}
+
+	response.WriteJSON(w, http.StatusCreated, project)
+}
+
+func (h *ProjectHandler) GetAll(w http.ResponseWriter, r *http.Request) {
+	projects, err := h.usecase.GetAll(r.Context())
+	if err != nil {
+		response.WriteError(
+			w,
+			http.StatusInternalServerError,
+			"INTERNAL_ERROR",
+			"internal server error",
+		)
+		return
+	}
+
+	response.WriteJSON(w, http.StatusOK, projects)
+}
+
+func (h *ProjectHandler) GetByID(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil || id <= 0 {
+		response.WriteError(
+			w,
+			http.StatusBadRequest,
+			"INVALID_ID",
+			"invalid project id",
+		)
+		return
+	}
+
+	project, err := h.usecase.GetByID(r.Context(), uint(id))
+	if err != nil {
+		if errors.Is(err, domain.ErrProjectNotFound) {
+			response.WriteError(
+				w,
+				http.StatusNotFound,
+				"PROJECT_NOT_FOUND",
+				"project not found",
+			)
+			return
+		}
+
+		response.WriteError(
+			w,
+			http.StatusInternalServerError,
+			"INTERNAL_ERROR",
+			"internal server error",
+		)
+		return
+	}
+
+	response.WriteJSON(w, http.StatusOK, project)
+}
+
+func (h *ProjectHandler) Update(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil || id <= 0 {
+		response.WriteError(
+			w,
+			http.StatusBadRequest,
+			"INVALID_ID",
+			"invalid project id",
+		)
+		return
+	}
+
+	var req dto.UpdateProjectRequest
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		response.WriteError(
+			w,
+			http.StatusBadRequest,
+			"INVALID_JSON",
+			"invalid JSON body",
+		)
+		return
+	}
+
+	project := &domain.Project{
+		ID:          uint(id),
+		Name:        req.Name,
+		Description: req.Description,
+	}
+
+	if err := h.usecase.Update(r.Context(), project); err != nil {
+		if errors.Is(err, domain.ErrProjectNotFound) {
+			response.WriteError(
+				w,
+				http.StatusNotFound,
+				"PROJECT_NOT_FOUND",
+				"project not found",
+			)
+			return
+		}
+
+		response.WriteError(
+			w,
+			http.StatusInternalServerError,
+			"INTERNAL_ERROR",
+			"internal server error",
+		)
+		return
+	}
+
+	response.WriteJSON(w, http.StatusOK, project)
+}
+
+func (h *ProjectHandler) Delete(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil || id <= 0 {
+		response.WriteError(
+			w,
+			http.StatusBadRequest,
+			"INVALID_ID",
+			"invalid project id",
+		)
+		return
+	}
+
+	if err := h.usecase.Delete(r.Context(), uint(id)); err != nil {
+		if errors.Is(err, domain.ErrProjectNotFound) {
+			response.WriteError(
+				w,
+				http.StatusNotFound,
+				"PROJECT_NOT_FOUND",
+				"project not found",
+			)
+			return
+		}
+
+		response.WriteError(
+			w,
+			http.StatusInternalServerError,
+			"INTERNAL_ERROR",
+			"internal server error",
+		)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+
+============================================================
+FILE: ./internal/delivery/http/router.go
+============================================================
+package http
+
+import (
+	"net/http"
+	"time"
+
+	swaggerui "github.com/swaggest/swgui/v5"
+
+	"backend-api/internal/delivery/http/handler"
+	"backend-api/internal/delivery/http/middleware"
+)
+
+func NewRouter(h *handler.Handler) http.Handler {
+	// API routes
+	apiMux := http.NewServeMux()
+
+	apiMux.HandleFunc("GET /health", h.Health)
+	//apiMux.HandleFunc("GET /panic-test", h.PanicTest)
+
+	apiMux.Handle(
+		"POST /api/v1/employees",
+		middleware.JSONContentType(
+			http.HandlerFunc(h.CreateEmployee),
+		),
+	)
+
+	apiMux.HandleFunc("GET /api/v1/employees", h.GetEmployees)
+	apiMux.HandleFunc("GET /api/v1/employees/{id}", h.GetEmployee)
+
+	apiMux.Handle(
+		"PUT /api/v1/employees/{id}",
+		middleware.JSONContentType(
+			http.HandlerFunc(h.UpdateEmployee),
+		),
+	)
+
+	apiMux.HandleFunc("DELETE /api/v1/employees/{id}", h.DeleteEmployee)
+
+	apiMux.Handle(
+		"POST /api/v1/projects",
+		middleware.JSONContentType(
+			http.HandlerFunc(h.CreateProject),
+		),
+	)
+
+	apiMux.HandleFunc("GET /api/v1/projects", h.GetProjects)
+	apiMux.HandleFunc("GET /api/v1/projects/{id}", h.GetProject)
+
+	apiMux.Handle(
+		"PUT /api/v1/projects/{id}",
+		middleware.JSONContentType(
+			http.HandlerFunc(h.UpdateProject),
+		),
+	)
+
+	apiMux.HandleFunc("DELETE /api/v1/projects/{id}", h.DeleteProject)
+	//  tasks
+	apiMux.Handle(
+		"POST /api/v1/tasks",
+		middleware.JSONContentType(
+			http.HandlerFunc(h.CreateTask),
+		),
+	)
+	apiMux.HandleFunc("GET /api/v1/tasks", h.GetTasks)
+	apiMux.HandleFunc("GET /api/v1/tasks/{id}", h.GetTask)
+
+	apiMux.Handle("PUT /api/v1/tasks/{id}", middleware.JSONContentType(
+		http.HandlerFunc(h.UpdateTask),
+	),
+	)
+
+	apiMux.HandleFunc("DELETE /api/v1/tasks/{id}", h.DeleteTask)
+	// Main router
+	mux := http.NewServeMux()
+
+	// API
+	mux.Handle("/", middleware.AcceptJSON(apiMux))
+
+	// OpenAPI specification
+	mux.HandleFunc("GET /openapi.json", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "docs/openapi.json")
+	})
+
+	// Swagger UI
+	swaggerHandler := swaggerui.New(
+		"Employee API",
+		"/openapi.json",
+		"/swagger/",
+	)
+
+	mux.Handle("/swagger/", swaggerHandler)
+
+	// Global middleware
+	return middleware.RequestID(
+		middleware.Recovery(
+			middleware.RequestLogger(
+				middleware.Timeout(5 * time.Second)(mux),
+			),
+		),
+	)
+}
+
+
+============================================================
+FILE: ./internal/delivery/http/dto/employee_dto.go
+============================================================
+package dto
+
+import "strings"
+
+type CreateEmployeeRequest struct {
+	Name       string  `json:"name"`
+	Email      string  `json:"email"`
+	Department *string `json:"department,omitempty"`
+}
+
+func (r CreateEmployeeRequest) Validate() bool {
+	return strings.TrimSpace(r.Name) != "" &&
+		strings.TrimSpace(r.Email) != ""
+}
+
+type UpdateEmployeeRequest struct {
+	Name       string  `json:"name"`
+	Email      string  `json:"email"`
+	Department *string `json:"department,omitempty"`
+}
+
+func (r UpdateEmployeeRequest) Validate() bool {
+	return strings.TrimSpace(r.Name) != "" &&
+		strings.TrimSpace(r.Email) != ""
+}
+
+type EmployeeResponse struct {
+	ID         int     `json:"id"`
+	Name       string  `json:"name"`
+	Email      string  `json:"email"`
+	Department *string `json:"department,omitempty"`
+}
+
+
+============================================================
+FILE: ./internal/delivery/http/dto/pagination.go
+============================================================
+package dto
+
+type Pagination struct {
+	Page       int `json:"page"`
+	PageSize   int `json:"page_size"`
+	Total      int `json:"total"`
+	TotalPages int `json:"total_pages"`
+}
+
+type EmployeeListResponse struct {
+	Data       []EmployeeResponse `json:"data"`
+	Pagination Pagination         `json:"pagination"`
+}
+
+
+============================================================
+FILE: ./internal/delivery/http/dto/project_dto.go
+============================================================
+package dto
+
+type CreateProjectRequest struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+}
+
+type UpdateProjectRequest struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+}
+
+
+============================================================
+FILE: ./internal/delivery/http/dto/task_dto.go
+============================================================
+package dto
+
+type CreateTaskRequest struct {
+	ProjectID uint   `json:"project_id"`
+	Title     string `json:"title"`
+	Status    string `json:"status"`
+}
+
+type UpdateTaskRequest struct {
+	ProjectID uint   `json:"project_id"`
+	Title     string `json:"title"`
+	Status    string `json:"status"`
+}
+
+
+============================================================
+FILE: ./internal/delivery/http/response/response.go
+============================================================
+package response
+
+import (
+	"encoding/json"
+	"net/http"
+)
+
+type ErrorResponse struct {
+	Error ErrorBody `json:"error"`
+}
+
+type ErrorBody struct {
+	Code    string `json:"code"`
+	Message string `json:"message"`
+}
+
+func WriteError(
+	w http.ResponseWriter,
+	status int,
+	code string,
+	message string,
+) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+
+	_ = json.NewEncoder(w).Encode(ErrorResponse{
+		Error: ErrorBody{
+			Code:    code,
+			Message: message,
+		},
+	})
+}
+
+func WriteJSON(
+	w http.ResponseWriter,
+	status int,
+	data any,
+) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+
+	_ = json.NewEncoder(w).Encode(data)
+}
+
+
+============================================================
+FILE: ./internal/repository/memory/project_repository.go
+============================================================
+package memory
+
+import (
+	"context"
+	"sync"
+
+	"backend-api/internal/domain"
+)
+
+type ProjectRepository struct {
+	mu       sync.RWMutex
+	projects map[uint]domain.Project
+	nextID   uint
+}
+
+func NewProjectRepository() *ProjectRepository {
+	return &ProjectRepository{
+		projects: make(map[uint]domain.Project),
+		nextID:   1,
+	}
+}
+
+func (r *ProjectRepository) Create(
+	ctx context.Context,
+	project *domain.Project,
+) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	project.ID = r.nextID
+	r.nextID++
+
+	r.projects[project.ID] = *project
+
+	return nil
+}
+
+func (r *ProjectRepository) GetByID(
+	ctx context.Context,
+	id uint,
+) (*domain.Project, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	project, ok := r.projects[id]
+	if !ok {
+		return nil, domain.ErrProjectNotFound
+	}
+
+	result := project
+
+	return &result, nil
+}
+
+func (r *ProjectRepository) GetAll(
+	ctx context.Context,
+) ([]domain.Project, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	projects := make([]domain.Project, 0, len(r.projects))
+
+	for _, project := range r.projects {
+		projects = append(projects, project)
+	}
+
+	return projects, nil
+}
+
+func (r *ProjectRepository) Update(
+	ctx context.Context,
+	project *domain.Project,
+) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if _, ok := r.projects[project.ID]; !ok {
+		return domain.ErrProjectNotFound
+	}
+
+	r.projects[project.ID] = *project
+
+	return nil
+}
+
+func (r *ProjectRepository) Delete(
+	ctx context.Context,
+	id uint,
+) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if _, ok := r.projects[id]; !ok {
+		return domain.ErrProjectNotFound
+	}
+
+	delete(r.projects, id)
+
+	return nil
+}
+
+
+============================================================
+FILE: ./internal/repository/memory/employee_repository.go
+============================================================
+package memory
+
+import (
+	"sort"
+	"strings"
+	"sync"
+
+	"backend-api/internal/domain"
+	"backend-api/internal/repository"
+)
+
+type EmployeeRepository struct {
+	mu        sync.RWMutex
+	employees map[int]domain.Employee
+	nextID    int
+	version   uint64
+}
+
+func NewEmployeeRepository() *EmployeeRepository {
+	return &EmployeeRepository{
+		employees: make(map[int]domain.Employee),
+		nextID:    1,
+	}
+}
+
+func (r *EmployeeRepository) Create(employee domain.Employee) (domain.Employee, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	employee.ID = r.nextID
+	r.nextID++
+
+	r.employees[employee.ID] = employee
+	r.version++
+	return employee, nil
+}
+
+func (r *EmployeeRepository) GetByID(id int) (domain.Employee, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	employee, ok := r.employees[id]
+	if !ok {
+		return domain.Employee{}, repository.ErrEmployeeNotFound
+	}
+
+	return employee, nil
+}
+func (r *EmployeeRepository) GetAll(
+	filter repository.EmployeeFilter,
+	sortBy repository.EmployeeSort,
+	offset, limit int,
+) ([]domain.Employee, int, uint64, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	employees := make([]domain.Employee, 0, len(r.employees))
+
+	for _, employee := range r.employees {
+
+		if filter.Name != "" &&
+			!strings.Contains(
+				strings.ToLower(employee.Name),
+				strings.ToLower(filter.Name),
+			) {
+			continue
+		}
+
+		if filter.Email != "" &&
+			!strings.Contains(
+				strings.ToLower(employee.Email),
+				strings.ToLower(filter.Email),
+			) {
+			continue
+		}
+
+		employees = append(employees, employee)
+	}
+	sort.Slice(employees, func(i, j int) bool {
+		var less bool
+		var greater bool
+
+		switch sortBy.Field {
+		case "name":
+			left := strings.ToLower(employees[i].Name)
+			right := strings.ToLower(employees[j].Name)
+
+			less = left < right
+			greater = left > right
+
+		case "email":
+			left := strings.ToLower(employees[i].Email)
+			right := strings.ToLower(employees[j].Email)
+
+			less = left < right
+			greater = left > right
+
+		default:
+			less = employees[i].ID < employees[j].ID
+			greater = employees[i].ID > employees[j].ID
+		}
+
+		if sortBy.Desc {
+			return greater
+		}
+
+		return less
+	})
+	total := len(employees)
+
+	if offset >= total {
+		return []domain.Employee{}, total, r.version, nil
+	}
+
+	end := offset + limit
+
+	if end > total {
+		end = total
+	}
+
+	return employees[offset:end], total, r.version, nil
+}
+func (r *EmployeeRepository) Update(employee domain.Employee) (domain.Employee, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if _, ok := r.employees[employee.ID]; !ok {
+		return domain.Employee{}, repository.ErrEmployeeNotFound
+	}
+
+	r.employees[employee.ID] = employee
+	r.version++
+	return employee, nil
+}
+
+func (r *EmployeeRepository) Delete(id int) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if _, ok := r.employees[id]; !ok {
+		return repository.ErrEmployeeNotFound
+	}
+
+	delete(r.employees, id)
+	r.version++
+	return nil
+}
+
+
+============================================================
+FILE: ./internal/repository/memory/task_repository.go
+============================================================
+package memory
+
+import (
+	"context"
+	"sync"
+
+	"backend-api/internal/domain"
+)
+
+type TaskRepository struct {
+	mu     sync.RWMutex
+	tasks  map[uint]domain.Task
+	nextID uint
+}
+
+func NewTaskRepository() *TaskRepository {
+	return &TaskRepository{
+		tasks:  make(map[uint]domain.Task),
+		nextID: 1,
+	}
+}
+
+func (r *TaskRepository) Create(ctx context.Context, task *domain.Task) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	task.ID = r.nextID
+	r.nextID++
+
+	r.tasks[task.ID] = *task
+
+	return nil
+}
+
+func (r *TaskRepository) GetByID(
+	ctx context.Context,
+	id uint,
+) (*domain.Task, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	task, ok := r.tasks[id]
+	if !ok {
+		return nil, domain.ErrTaskNotFound
+	}
+
+	result := task
+
+	return &result, nil
+}
+
+func (r *TaskRepository) GetAll(
+	ctx context.Context,
+) ([]domain.Task, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	tasks := make([]domain.Task, 0, len(r.tasks))
+
+	for _, task := range r.tasks {
+		tasks = append(tasks, task)
+	}
+
+	return tasks, nil
+}
+
+func (r *TaskRepository) Update(
+	ctx context.Context,
+	task *domain.Task,
+) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if _, ok := r.tasks[task.ID]; !ok {
+		return domain.ErrTaskNotFound
+	}
+
+	r.tasks[task.ID] = *task
+
+	return nil
+}
+
+func (r *TaskRepository) Delete(
+	ctx context.Context,
+	id uint,
+) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if _, ok := r.tasks[id]; !ok {
+		return domain.ErrTaskNotFound
+	}
+
+	delete(r.tasks, id)
+
+	return nil
+}
+
+
+============================================================
+FILE: ./internal/repository/project_repository.go
+============================================================
+package repository
+
+import (
+	"context"
+
+	"backend-api/internal/domain"
+)
+
+type ProjectRepository interface {
+	Create(ctx context.Context, project *domain.Project) error
+	GetByID(ctx context.Context, id uint) (*domain.Project, error)
+	GetAll(ctx context.Context) ([]domain.Project, error)
+	Update(ctx context.Context, project *domain.Project) error
+	Delete(ctx context.Context, id uint) error
+}
+
+
+============================================================
+FILE: ./internal/repository/employee_repository.go
+============================================================
+package repository
+
+import (
+	"errors"
+
+	"backend-api/internal/domain"
+)
+
+var ErrEmployeeNotFound = errors.New("employee not found")
+
+type EmployeeFilter struct {
+	Name  string
+	Email string
+}
+type EmployeeSort struct {
+	Field string
+	Desc  bool
+}
+
+type EmployeeRepository interface {
+	Create(employee domain.Employee) (domain.Employee, error)
+	GetByID(id int) (domain.Employee, error)
+	GetAll(
+		filter EmployeeFilter,
+		sort EmployeeSort,
+		offset, limit int,
+	) ([]domain.Employee, int, uint64, error)
+	Update(employee domain.Employee) (domain.Employee, error)
+	Delete(id int) error
+}
+
+
+============================================================
+FILE: ./internal/repository/task_repository.go
+============================================================
+package repository
+
+import (
+	"context"
+
+	"backend-api/internal/domain"
+)
+
+type TaskRepository interface {
+	Create(ctx context.Context, task *domain.Task) error
+	GetByID(ctx context.Context, id uint) (*domain.Task, error)
+	GetAll(ctx context.Context) ([]domain.Task, error)
+	Update(ctx context.Context, task *domain.Task) error
+	Delete(ctx context.Context, id uint) error
+}
+
+
+============================================================
+FILE: ./internal/repository/postgres/project_repository.go
+============================================================
+package postgres
+
+import (
+	"context"
+	"errors"
+
+	"gorm.io/gorm"
+
+	"backend-api/internal/domain"
+)
+
+type ProjectPostgresRepo struct {
+	db *gorm.DB
+}
+
+func NewProjectRepository(db *gorm.DB) *ProjectPostgresRepo {
+	return &ProjectPostgresRepo{
+		db: db,
+	}
+}
+
+func (r *ProjectPostgresRepo) Create(ctx context.Context, project *domain.Project) error {
+	result := r.db.WithContext(ctx).Create(project)
+	if result.Error != nil {
+		return result.Error
+	}
+	return nil
+}
+
+func (r *ProjectPostgresRepo) GetByID(ctx context.Context, id uint) (*domain.Project, error) {
+	var project domain.Project
+	result := r.db.WithContext(ctx).First(&project, id)
+	if result.Error != nil {
+		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+			return nil, domain.ErrProjectNotFound
+		}
+		return nil, result.Error
+	}
+	return &project, nil
+}
+
+func (r *ProjectPostgresRepo) GetAll(ctx context.Context) ([]domain.Project, error) {
+	var projects []domain.Project
+	result := r.db.WithContext(ctx).Find(&projects)
+	if result.Error != nil {
+		return nil, result.Error
+	}
+	return projects, nil
+}
+
+func (r *ProjectPostgresRepo) Update(ctx context.Context, project *domain.Project) error {
+	result := r.db.WithContext(ctx).Save(project)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return domain.ErrProjectNotFound
+	}
+	return nil
+}
+
+func (r *ProjectPostgresRepo) Delete(ctx context.Context, id uint) error {
+	result := r.db.WithContext(ctx).Delete(&domain.Project{}, id)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return domain.ErrProjectNotFound
+	}
+	return nil
+}
+
+
+============================================================
+FILE: ./internal/repository/postgres/employee_repository.go
+============================================================
+package postgres
+
+import (
+	"errors"
+
+	"gorm.io/gorm"
+
+	"backend-api/internal/domain"
+	"backend-api/internal/repository"
+)
+
+type EmployeeRepository struct {
+	db *gorm.DB
+}
+
+func NewEmployeeRepository(db *gorm.DB) *EmployeeRepository {
+	return &EmployeeRepository{
+		db: db,
+	}
+}
+
+// Create creates a new employee in PostgreSQL.
+func (r *EmployeeRepository) Create(
+	employee domain.Employee,
+) (domain.Employee, error) {
+
+	result := r.db.Create(&employee)
+
+	if result.Error != nil {
+		return domain.Employee{}, result.Error
+	}
+
+	return employee, nil
+}
+
+// GetByID returns one employee by ID.
+func (r *EmployeeRepository) GetByID(
+	id int,
+) (domain.Employee, error) {
+
+	var employee domain.Employee
+
+	result := r.db.
+		Where("id = ?", id).
+		First(&employee)
+
+	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+		return domain.Employee{}, domain.ErrEmployeeNotFound
+	}
+
+	if result.Error != nil {
+		return domain.Employee{}, result.Error
+	}
+
+	return employee, nil
+}
+
+// GetAll returns employees with filtering, sorting and pagination.
+func (r *EmployeeRepository) GetAll(
+	filter repository.EmployeeFilter,
+	sortBy repository.EmployeeSort,
+	offset, limit int,
+) ([]domain.Employee, int, uint64, error) {
+
+	query := r.db.Model(&domain.Employee{})
+
+	// Filtering
+	if filter.Name != "" {
+		query = query.Where(
+			"LOWER(name) LIKE LOWER(?)",
+			"%"+filter.Name+"%",
+		)
+	}
+
+	if filter.Email != "" {
+		query = query.Where(
+			"LOWER(email) LIKE LOWER(?)",
+			"%"+filter.Email+"%",
+		)
+	}
+
+	// Total number of employees after filtering.
+	var total int64
+
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, 0, err
+	}
+
+	// Sorting
+	order := "id ASC"
+
+	switch sortBy.Field {
+	case "name":
+		order = "name ASC"
+	case "email":
+		order = "email ASC"
+	default:
+		order = "id ASC"
+	}
+
+	if sortBy.Desc {
+		order = order[:len(order)-3] + " DESC"
+	}
+
+	query = query.Order(order)
+
+	// Pagination
+	query = query.
+		Offset(offset).
+		Limit(limit)
+
+	var employees []domain.Employee
+
+	if err := query.Find(&employees).Error; err != nil {
+		return nil, 0, 0, err
+	}
+
+	return employees, int(total), 0, nil
+}
+
+// Update updates an existing employee.
+func (r *EmployeeRepository) Update(
+	employee domain.Employee,
+) (domain.Employee, error) {
+
+	result := r.db.
+		Model(&domain.Employee{}).
+		Where("id = ?", employee.ID).
+		Updates(map[string]interface{}{
+			"name":       employee.Name,
+			"email":      employee.Email,
+			"department": employee.Department,
+		})
+
+	if result.Error != nil {
+		return domain.Employee{}, result.Error
+	}
+
+	if result.RowsAffected == 0 {
+		return domain.Employee{}, domain.ErrEmployeeNotFound
+	}
+
+	return r.GetByID(employee.ID)
+}
+
+// Delete deletes an employee by ID.
+func (r *EmployeeRepository) Delete(id int) error {
+
+	result := r.db.
+		Delete(&domain.Employee{}, id)
+
+	if result.Error != nil {
+		return result.Error
+	}
+
+	if result.RowsAffected == 0 {
+		return domain.ErrEmployeeNotFound
+	}
+
+	return nil
+}
+
+
+============================================================
+FILE: ./internal/repository/postgres/task_repository.go
+============================================================
+package postgres
+
+import (
+	"context"
+	"errors"
+
+	"gorm.io/gorm"
+
+	"backend-api/internal/domain"
+)
+
+type TaskRepository struct {
+	db *gorm.DB
+}
+
+func NewTaskRepository(db *gorm.DB) *TaskRepository {
+	return &TaskRepository{
+		db: db,
+	}
+}
+
+func (r *TaskRepository) Create(ctx context.Context, task *domain.Task) error {
+	return r.db.WithContext(ctx).Create(task).Error
+}
+
+func (r *TaskRepository) GetByID(ctx context.Context, id uint) (*domain.Task, error) {
+	var task domain.Task
+
+	err := r.db.WithContext(ctx).
+		Preload("Project").
+		First(&task, id).Error
+
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, domain.ErrTaskNotFound
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &task, nil
+}
+
+func (r *TaskRepository) GetAll(ctx context.Context) ([]domain.Task, error) {
+	var tasks []domain.Task
+
+	err := r.db.WithContext(ctx).
+		Preload("Project").
+		Find(&tasks).Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return tasks, nil
+}
+
+func (r *TaskRepository) Update(ctx context.Context, task *domain.Task) error {
+	result := r.db.WithContext(ctx).
+		Model(&domain.Task{}).
+		Where("id = ?", task.ID).
+		Updates(task)
+
+	if result.Error != nil {
+		return result.Error
+	}
+
+	if result.RowsAffected == 0 {
+		return domain.ErrTaskNotFound
+	}
+
+	return nil
+}
+
+func (r *TaskRepository) Delete(ctx context.Context, id uint) error {
+	result := r.db.WithContext(ctx).
+		Delete(&domain.Task{}, id)
+
+	if result.Error != nil {
+		return result.Error
+	}
+
+	if result.RowsAffected == 0 {
+		return domain.ErrTaskNotFound
+	}
+
+	return nil
+}
+
+
+============================================================
+FILE: ./internal/config/config.go
+============================================================
+package config
+
+import (
+	"fmt"
+	"os"
+	"strconv"
+	"time"
+)
+
+type Config struct {
+	Port string
+
+	DBHost     string
+	DBPort     string
+	DBUser     string
+	DBPassword string
+	DBName     string
+
+	MaxOpenConns    int
+	MaxIdleConns    int
+	ConnMaxLifetime time.Duration
+	ConnMaxIdleTime time.Duration
+
+	RequestTimeout time.Duration
+}
+
+func Load() (Config, error) {
+	cfg := Config{
+		Port: getEnv("PORT", "8443"),
+
+		DBHost:     getEnv("DB_HOST", "localhost"),
+		DBPort:     getEnv("DB_PORT", "5434"),
+		DBUser:     getEnv("DB_USER", "postgres"),
+		DBPassword: getEnv("DB_PASSWORD", "postgrespassword"),
+		DBName:     getEnv("DB_NAME", "employee_db"),
+
+		RequestTimeout: getEnvDuration(
+			"REQUEST_TIMEOUT",
+			5*time.Second,
+		),
+
+		ConnMaxLifetime: getEnvDuration(
+			"DB_CONN_MAX_LIFETIME",
+			30*time.Minute,
+		),
+
+		ConnMaxIdleTime: getEnvDuration(
+			"DB_CONN_MAX_IDLE_TIME",
+			5*time.Minute,
+		),
+	}
+
+	var err error
+
+	cfg.MaxOpenConns, err = getEnvInt(
+		"DB_MAX_OPEN_CONNS",
+		25,
+	)
+	if err != nil {
+		return Config{}, err
+	}
+
+	cfg.MaxIdleConns, err = getEnvInt(
+		"DB_MAX_IDLE_CONNS",
+		10,
+	)
+	if err != nil {
+		return Config{}, err
+	}
+
+	if err := validate(cfg); err != nil {
+		return Config{}, err
+	}
+
+	return cfg, nil
+}
+
+func validate(cfg Config) error {
+	if cfg.Port == "" {
+		return fmt.Errorf("PORT is required")
+	}
+
+	if cfg.RequestTimeout <= 0 {
+		return fmt.Errorf("REQUEST_TIMEOUT must be greater than zero")
+	}
+
+	if cfg.MaxOpenConns <= 0 {
+		return fmt.Errorf(
+			"DB_MAX_OPEN_CONNS must be greater than zero",
+		)
+	}
+
+	if cfg.MaxIdleConns < 0 {
+		return fmt.Errorf(
+			"DB_MAX_IDLE_CONNS cannot be negative",
+		)
+	}
+
+	if cfg.MaxIdleConns > cfg.MaxOpenConns {
+		return fmt.Errorf(
+			"DB_MAX_IDLE_CONNS cannot be greater than DB_MAX_OPEN_CONNS",
+		)
+	}
+
+	return nil
+}
+
+func getEnv(key, fallback string) string {
+	value := os.Getenv(key)
+
+	if value == "" {
+		return fallback
+	}
+
+	return value
+}
+
+func getEnvInt(
+	key string,
+	fallback int,
+) (int, error) {
+	value := os.Getenv(key)
+
+	if value == "" {
+		return fallback, nil
+	}
+
+	result, err := strconv.Atoi(value)
+
+	if err != nil {
+		return 0, fmt.Errorf(
+			"%s must be an integer: %w",
+			key,
+			err,
+		)
+	}
+
+	return result, nil
+}
+
+func getEnvDuration(
+	key string,
+	fallback time.Duration,
+) time.Duration {
+	value := os.Getenv(key)
+
+	if value == "" {
+		return fallback
+	}
+
+	result, err := time.ParseDuration(value)
+
+	if err != nil {
+		return fallback
+	}
+
+	return result
+}
+
+
+============================================================
+FILE: ./internal/database/postgres.go
+============================================================
+package database
+
+import (
+	"database/sql"
+	"fmt"
+
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
+
+	"backend-api/internal/config"
+	"backend-api/internal/domain"
+)
+
+func NewPostgres(cfg config.Config) (*gorm.DB, error) {
+	dsn := fmt.Sprintf(
+		"host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
+		cfg.DBHost,
+		cfg.DBPort,
+		cfg.DBUser,
+		cfg.DBPassword,
+		cfg.DBName,
+	)
+
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to postgres: %w", err)
+	}
+
+	sqlDB, err := db.DB()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get sql db: %w", err)
+	}
+
+	// Connection Pool
+	sqlDB.SetMaxOpenConns(cfg.MaxOpenConns)
+	sqlDB.SetMaxIdleConns(cfg.MaxIdleConns)
+	sqlDB.SetConnMaxLifetime(cfg.ConnMaxLifetime)
+	sqlDB.SetConnMaxIdleTime(cfg.ConnMaxIdleTime)
+
+	if err := sqlDB.Ping(); err != nil {
+		return nil, fmt.Errorf("failed to ping postgres: %w", err)
+	}
+
+	// Auto-migration
+	if err := autoMigrate(db); err != nil {
+		return nil, fmt.Errorf("failed to auto-migrate: %w", err)
+	}
+
+	return db, nil
+}
+
+func autoMigrate(db *gorm.DB) error {
+	// ترتيب المigration مهم بسبب الـ Foreign Keys
+	if err := db.AutoMigrate(&domain.Project{}); err != nil {
+		return fmt.Errorf("failed to migrate Project: %w", err)
+	}
+
+	if err := db.AutoMigrate(&domain.Task{}); err != nil {
+		return fmt.Errorf("failed to migrate Task: %w", err)
+	}
+
+	if err := db.AutoMigrate(&domain.Employee{}); err != nil {
+		return fmt.Errorf("failed to migrate Employee: %w", err)
+	}
+
+	return nil
+}
+
+func Stats(db *gorm.DB) sql.DBStats {
+	sqlDB, err := db.DB()
+	if err != nil {
+		return sql.DBStats{}
+	}
+	return sqlDB.Stats()
+}
+
+
+============================================================
+FILE: ./internal/domain/employee.go
+============================================================
+package domain
+
+type Employee struct {
+	ID         int     `gorm:"primaryKey" json:"id"`
+	Name       string  `gorm:"not null" json:"name"`
+	Email      string  `gorm:"unique;not null" json:"email"`
+	Department *string `json:"department,omitempty"`
+}
+
+
+============================================================
+FILE: ./internal/domain/task.go
+============================================================
+package domain
+
+type Task struct {
+	ID        uint   `gorm:"primaryKey" json:"id"`
+	ProjectID uint   `gorm:"not null;index" json:"project_id"`
+	Title     string `gorm:"not null" json:"title"`
+	Status    string `gorm:"default:'pending'" json:"status"`
+	// العلاقة: Task ينتمي إلى Project
+	Project Project `gorm:"foreignKey:ProjectID" json:"project,omitempty"`
+}
+
+
+============================================================
+FILE: ./internal/domain/project.go
+============================================================
+package domain
+
+// حذف السطر التالي:
+// var ErrProjectNotFound = errors.New("project not found")
+
+type Project struct {
+	ID          uint   `gorm:"primaryKey" json:"id"`
+	Name        string `gorm:"not null" json:"name"`
+	Description string `json:"description"`
+	Tasks       []Task `gorm:"foreignKey:ProjectID" json:"tasks,omitempty"`
+}
+
+
+============================================================
+FILE: ./internal/domain/errors.go
+============================================================
+package domain
+
+import "errors"
+
+var (
+	ErrProjectNotFound  = errors.New("project not found")
+	ErrTaskNotFound     = errors.New("task not found")
+	ErrEmployeeNotFound = errors.New("employee not found")
+)
+
+
+============================================================
+FILE: ./cmd/api/main.go
+============================================================
+package main
+
+import (
+	"log/slog"
+	"net/http"
+	"os"
+
+	"backend-api/internal/config"
+	"backend-api/internal/database"
+	httpdelivery "backend-api/internal/delivery/http"
+	"backend-api/internal/delivery/http/handler"
+	"backend-api/internal/repository/postgres"
+	"backend-api/internal/usecase"
+)
+
+func main() {
+	logger := slog.New(
+		slog.NewJSONHandler(
+			os.Stdout,
+			&slog.HandlerOptions{
+				Level: slog.LevelInfo,
+			},
+		),
+	)
+
+	slog.SetDefault(logger)
+
+	cfg, err := config.Load()
+
+	if err != nil {
+		slog.Error(
+			"configuration validation failed",
+			"error", err,
+		)
+
+		return
+	}
+
+	// Database
+	db, err := database.NewPostgres(cfg)
+
+	if err != nil {
+		slog.Error(
+			"database connection failed",
+			"error", err,
+		)
+
+		return
+	}
+
+	// Repository
+	repo := postgres.NewEmployeeRepository(db)
+	employeeUC := usecase.NewEmployeeUsecase(repo)
+
+	projectRepo := postgres.NewProjectRepository(db)
+	projectUC := usecase.NewProjectUsecase(projectRepo)
+
+	taskRepo := postgres.NewTaskRepository(db)
+	taskUC := usecase.NewTaskUsecase(taskRepo)
+
+	h := handler.NewHandler(employeeUC, projectUC, taskUC)
+	// Router
+	router := httpdelivery.NewRouter(h)
+
+	// Port
+	port := cfg.Port
+
+	addr := ":" + port
+
+	slog.Info("HTTPS server starting", "addr", addr)
+
+	// HTTPS Server
+	err = http.ListenAndServeTLS(
+		addr,
+		"certs/cert.pem",
+		"certs/key.pem",
+		router,
+	)
+
+	if err != nil {
+		slog.Error("server failed", "error", err)
+	}
+}
+

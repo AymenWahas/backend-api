@@ -2,13 +2,10 @@ package memory
 
 import (
 	"context"
-	"errors"
 	"sync"
 
 	"backend-api/internal/domain"
 )
-
-var ErrTaskNotFound = errors.New("task not found")
 
 type TaskRepository struct {
 	mu     sync.RWMutex
@@ -39,7 +36,10 @@ func (r *TaskRepository) Create(ctx context.Context, task *domain.Task) error {
 	return nil
 }
 
-func (r *TaskRepository) GetByID(ctx context.Context, id uint) (*domain.Task, error) {
+func (r *TaskRepository) GetByID(
+	ctx context.Context,
+	id uint,
+) (*domain.Task, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -49,7 +49,7 @@ func (r *TaskRepository) GetByID(ctx context.Context, id uint) (*domain.Task, er
 
 	task, ok := r.tasks[id]
 	if !ok {
-		return nil, ErrTaskNotFound
+		return nil, domain.ErrTaskNotFound
 	}
 
 	result := task
@@ -57,7 +57,9 @@ func (r *TaskRepository) GetByID(ctx context.Context, id uint) (*domain.Task, er
 	return &result, nil
 }
 
-func (r *TaskRepository) GetAll(ctx context.Context) ([]domain.Task, error) {
+func (r *TaskRepository) GetAll(
+	ctx context.Context,
+) ([]domain.Task, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -74,7 +76,10 @@ func (r *TaskRepository) GetAll(ctx context.Context) ([]domain.Task, error) {
 	return tasks, nil
 }
 
-func (r *TaskRepository) Update(ctx context.Context, task *domain.Task) error {
+func (r *TaskRepository) Update(
+	ctx context.Context,
+	task *domain.Task,
+) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -83,7 +88,7 @@ func (r *TaskRepository) Update(ctx context.Context, task *domain.Task) error {
 	defer r.mu.Unlock()
 
 	if _, ok := r.tasks[task.ID]; !ok {
-		return ErrTaskNotFound
+		return domain.ErrTaskNotFound
 	}
 
 	r.tasks[task.ID] = *task
@@ -91,7 +96,10 @@ func (r *TaskRepository) Update(ctx context.Context, task *domain.Task) error {
 	return nil
 }
 
-func (r *TaskRepository) Delete(ctx context.Context, id uint) error {
+func (r *TaskRepository) Delete(
+	ctx context.Context,
+	id uint,
+) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -100,7 +108,7 @@ func (r *TaskRepository) Delete(ctx context.Context, id uint) error {
 	defer r.mu.Unlock()
 
 	if _, ok := r.tasks[id]; !ok {
-		return ErrTaskNotFound
+		return domain.ErrTaskNotFound
 	}
 
 	delete(r.tasks, id)

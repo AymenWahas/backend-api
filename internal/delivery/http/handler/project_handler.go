@@ -9,7 +9,6 @@ import (
 	"backend-api/internal/delivery/http/dto"
 	"backend-api/internal/delivery/http/response"
 	"backend-api/internal/domain"
-	"backend-api/internal/repository/memory"
 	"backend-api/internal/usecase"
 )
 
@@ -93,7 +92,7 @@ func (h *ProjectHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 
 	project, err := h.usecase.GetByID(r.Context(), uint(id))
 	if err != nil {
-		if errors.Is(err, memory.ErrProjectNotFound) {
+		if errors.Is(err, domain.ErrProjectNotFound) {
 			response.WriteError(
 				w,
 				http.StatusNotFound,
@@ -146,7 +145,7 @@ func (h *ProjectHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.usecase.Update(r.Context(), project); err != nil {
-		if errors.Is(err, memory.ErrProjectNotFound) {
+		if errors.Is(err, domain.ErrProjectNotFound) {
 			response.WriteError(
 				w,
 				http.StatusNotFound,
@@ -181,7 +180,7 @@ func (h *ProjectHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.usecase.Delete(r.Context(), uint(id)); err != nil {
-		if errors.Is(err, memory.ErrProjectNotFound) {
+		if errors.Is(err, domain.ErrProjectNotFound) {
 			response.WriteError(
 				w,
 				http.StatusNotFound,

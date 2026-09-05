@@ -1,0 +1,48 @@
+ayman-wahas@ayman-wahas:~/backend-api$ go test ./internal/usecase -v -count=1
+=== RUN   TestCreateEmployee
+=== RUN   TestCreateEmployee/valid_employee_trims_spaces
+=== RUN   TestCreateEmployee/empty_name
+=== RUN   TestCreateEmployee/empty_email
+=== RUN   TestCreateEmployee/repository_error
+--- PASS: TestCreateEmployee (0.00s)
+    --- PASS: TestCreateEmployee/valid_employee_trims_spaces (0.00s)
+    --- PASS: TestCreateEmployee/empty_name (0.00s)
+    --- PASS: TestCreateEmployee/empty_email (0.00s)
+    --- PASS: TestCreateEmployee/repository_error (0.00s)
+=== RUN   TestUpdateEmployee
+--- PASS: TestUpdateEmployee (0.00s)
+PASS
+ok      backend-api/internal/usecase    0.007s
+
+
+
+
+
+table 
+ayman-wahas@ayman-wahas:~/backend-api$ go test ./internal/usecase -v -count=1
+=== RUN   TestCreateEmployee
+=== RUN   TestCreateEmployee/valid_employee_trims_spaces
+=== RUN   TestCreateEmployee/empty_name
+=== RUN   TestCreateEmployee/empty_email
+=== RUN   TestCreateEmployee/repository_error
+--- PASS: TestCreateEmployee (0.00s)
+    --- PASS: TestCreateEmployee/valid_employee_trims_spaces (0.00s)
+    --- PASS: TestCreateEmployee/empty_name (0.00s)
+    --- PASS: TestCreateEmployee/empty_email (0.00s)
+    --- PASS: TestCreateEmployee/repository_error (0.00s)
+=== RUN   TestUpdateEmployee
+=== RUN   TestUpdateEmployee/valid_employee_trims_spaces
+=== RUN   TestUpdateEmployee/zero_ID
+=== RUN   TestUpdateEmployee/negative_ID
+=== RUN   TestUpdateEmployee/empty_name
+=== RUN   TestUpdateEmployee/empty_email
+=== RUN   TestUpdateEmployee/repository_error
+--- PASS: TestUpdateEmployee (0.00s)
+    --- PASS: TestUpdateEmployee/valid_employee_trims_spaces (0.00s)
+    --- PASS: TestUpdateEmployee/zero_ID (0.00s)
+    --- PASS: TestUpdateEmployee/negative_ID (0.00s)
+    --- PASS: TestUpdateEmployee/empty_name (0.00s)
+    --- PASS: TestUpdateEmployee/empty_email (0.00s)
+    --- PASS: TestUpdateEmployee/repository_error (0.00s)
+PASS
+ok      backend-api/internal/usecase    0.009s

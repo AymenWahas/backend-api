@@ -60,13 +60,13 @@ func (h *Handler) CreateEmployee(w http.ResponseWriter, r *http.Request) {
 		)
 		return
 	}
-
+	//dto to domain
 	employee := domain.Employee{
 		Name:       req.Name,
 		Email:      req.Email,
 		Department: req.Department,
 	}
-
+	//call usecase to create employee
 	created, err := h.usecase.CreateEmployee(employee)
 	if err != nil {
 		if errors.Is(err, usecase.ErrInvalidEmployee) {
@@ -79,22 +79,20 @@ func (h *Handler) CreateEmployee(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		response.WriteError(
-			w,
-			http.StatusInternalServerError,
+		response.WriteError(w, http.StatusInternalServerError,
 			"INTERNAL_ERROR",
 			"internal server error",
 		)
 		return
 	}
-
+	// domain to dto
 	res := dto.EmployeeResponse{
 		ID:         created.ID,
 		Name:       created.Name,
 		Email:      created.Email,
 		Department: req.Department,
 	}
-
+	//send response error if any other error occurs
 	response.WriteJSON(w, http.StatusCreated, res)
 }
 
@@ -104,6 +102,7 @@ func (h *Handler) GetEmployees(w http.ResponseWriter, r *http.Request) {
 		Name:  query.Get("name"),
 		Email: query.Get("email"),
 	}
+	//sort by id, name, email
 	sortParam := query.Get("sort")
 
 	sortBy := repository.EmployeeSort{
@@ -128,6 +127,7 @@ func (h *Handler) GetEmployees(w http.ResponseWriter, r *http.Request) {
 		)
 		return
 	}
+	//pagination
 	page := 1
 	pageSize := 10
 
@@ -163,6 +163,7 @@ func (h *Handler) GetEmployees(w http.ResponseWriter, r *http.Request) {
 
 	offset := (page - 1) * pageSize
 
+	//call usecase to get employees with filter, sort and pagination
 	employees, total, version, err := h.usecase.GetEmployees(
 		filter,
 		sortBy,
@@ -178,7 +179,7 @@ func (h *Handler) GetEmployees(w http.ResponseWriter, r *http.Request) {
 		)
 		return
 	}
-
+	//set etag header for caching
 	etag := fmt.Sprintf(
 		`"employees-%d-page-%d-size-%d-name-%s-email-%s-sort-%s-desc-%t"`,
 		version,
@@ -190,12 +191,12 @@ func (h *Handler) GetEmployees(w http.ResponseWriter, r *http.Request) {
 		sortBy.Desc,
 	)
 	w.Header().Set("ETag", etag)
-
+	//check if the etag matches the request header, if so return 304 Not Modified
 	if r.Header.Get("If-None-Match") == etag {
 		w.WriteHeader(http.StatusNotModified)
 		return
 	}
-
+	//convert domain employees to dto employees
 	data := make([]dto.EmployeeResponse, 0, len(employees))
 
 	for _, employee := range employees {
@@ -206,12 +207,12 @@ func (h *Handler) GetEmployees(w http.ResponseWriter, r *http.Request) {
 			Department: employee.Department,
 		})
 	}
-
+	//calculate total pages for pagination
 	totalPages := 0
 	if total > 0 {
 		totalPages = (total + pageSize - 1) / pageSize
 	}
-
+	//create response with data and pagination info
 	res := dto.EmployeeListResponse{
 		Data: data,
 		Pagination: dto.Pagination{
@@ -225,6 +226,7 @@ func (h *Handler) GetEmployees(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, http.StatusOK, res)
 }
 
+// GetEmployee handles the GET /employees/{id} endpoint.
 func (h *Handler) GetEmployee(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil || id <= 0 {
@@ -402,8 +404,6 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) DeleteTask(w http.ResponseWriter, r *http.Request) {
 	h.taskHandler.Delete(w, r)
 }
-
-
 
 //func (h *Handler) PanicTest(w http.ResponseWriter, r *http.Request) {
 //	panic("test panic")

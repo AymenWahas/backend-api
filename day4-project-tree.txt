@@ -1,0 +1,67 @@
+.
+├── cmd
+│   └── api
+│       └── main.go
+├── day4-project-tree.txt
+├── docs
+│   ├── day2-curl-collection.sh
+│   ├── openapi.json
+│   └── openapi.yaml
+├── Evidence
+│   ├── day1-evidence.txt
+│   ├── day2.txt
+│   └── day 3.txt
+├── .gitignore
+├── go.mod
+├── go.sum
+├── internal
+│   ├── config
+│   │   └── config.go
+│   ├── database
+│   │   └── postgres.go
+│   ├── delivery
+│   │   └── http
+│   │       ├── dto
+│   │       │   ├── employee_dto.go
+│   │       │   ├── pagination.go
+│   │       │   ├── project_dto.go
+│   │       │   └── task_dto.go
+│   │       ├── handler
+│   │       │   ├── employee_handler.go
+│   │       │   ├── project_handler.go
+│   │       │   └── task_handler.go
+│   │       ├── middleware
+│   │       │   ├── accept.go
+│   │       │   ├── content_type.go
+│   │       │   ├── recovery.go
+│   │       │   ├── request_id.go
+│   │       │   ├── request_logger.go
+│   │       │   └── timeout.go
+│   │       ├── response
+│   │       │   └── response.go
+│   │       └── router.go
+│   ├── domain
+│   │   ├── employee.go
+│   │   ├── errors.go
+│   │   ├── project.go
+│   │   └── task.go
+│   ├── repository
+│   │   ├── employee_repository.go
+│   │   ├── memory
+│   │   │   ├── employee_repository.go
+│   │   │   ├── project_repository.go
+│   │   │   └── task_repository.go
+│   │   ├── postgres
+│   │   │   ├── employee_repository.go
+│   │   │   ├── project_repository.go
+│   │   │   └── task_repository.go
+│   │   ├── project_repository.go
+│   │   └── task_repository.go
+│   └── usecase
+│       ├── employee_usecase.go
+│       ├── employee_usecase_test.go
+│       ├── project_usecase.go
+│       └── task_usecase.go
+└── up to git .txt
+
+19 directories, 46 files
