@@ -13,9 +13,7 @@ import (
 func NewRouter(h *handler.Handler) http.Handler {
 	// API routes
 	apiMux := http.NewServeMux()
-
 	apiMux.HandleFunc("GET /health", h.Health)
-
 	apiMux.Handle(
 		"POST /api/v1/employees",
 		middleware.JSONContentType(

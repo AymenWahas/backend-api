@@ -1,67 +1,34 @@
-.
-├── cmd
-│   └── api
-│       └── main.go
-├── day4-project-tree.txt
-├── docs
-│   ├── day2-curl-collection.sh
-│   ├── openapi.json
-│   └── openapi.yaml
-├── Evidence
-│   ├── day1-evidence.txt
-│   ├── day2.txt
-│   └── day 3.txt
-├── .gitignore
-├── go.mod
-├── go.sum
-├── internal
-│   ├── config
-│   │   └── config.go
-│   ├── database
-│   │   └── postgres.go
-│   ├── delivery
-│   │   └── http
-│   │       ├── dto
-│   │       │   ├── employee_dto.go
-│   │       │   ├── pagination.go
-│   │       │   ├── project_dto.go
-│   │       │   └── task_dto.go
-│   │       ├── handler
-│   │       │   ├── employee_handler.go
-│   │       │   ├── project_handler.go
-│   │       │   └── task_handler.go
-│   │       ├── middleware
-│   │       │   ├── accept.go
-│   │       │   ├── content_type.go
-│   │       │   ├── recovery.go
-│   │       │   ├── request_id.go
-│   │       │   ├── request_logger.go
-│   │       │   └── timeout.go
-│   │       ├── response
-│   │       │   └── response.go
-│   │       └── router.go
-│   ├── domain
-│   │   ├── employee.go
-│   │   ├── errors.go
-│   │   ├── project.go
-│   │   └── task.go
-│   ├── repository
-│   │   ├── employee_repository.go
-│   │   ├── memory
-│   │   │   ├── employee_repository.go
-│   │   │   ├── project_repository.go
-│   │   │   └── task_repository.go
-│   │   ├── postgres
-│   │   │   ├── employee_repository.go
-│   │   │   ├── project_repository.go
-│   │   │   └── task_repository.go
-│   │   ├── project_repository.go
-│   │   └── task_repository.go
-│   └── usecase
-│       ├── employee_usecase.go
-│       ├── employee_usecase_test.go
-│       ├── project_usecase.go
-│       └── task_usecase.go
-└── up to git .txt
 
-19 directories, 46 files
+الان سوف اعطيك متطلبات اليوم الثالث وهي:
+router.handler,midlleware service/use case ,repositries,debandency injection, and package boundaries.
+
+context propagation, request timeout, domain versus transport errors ,structureed logs ,request IDs ,and panic recovery.
+
+اضننا قمنا ببعضها في مشروعنا لليوم الاول والثاني مثل منهجيه كلين لرتشتكتر
+هل يلزمنا مشروع اخر ام نعتمد علا هذا
+
+
+Moduler-monolith principles and avoiding premature microservices
+
+Practice: implement project and task endpoints with an in-memory repository.
+Evidence: working API,clean dependency direction ,loges with request IDs,and configuration valdation
+
+اليوم الرابع وصف المتطلبات
+day4 -testing and engineering quality
+
+1. test pyramid, table-driven unit tests ,httptest, fakes and mocks, deterministic test, and coverage interpretation
+
+2) formatting,vet/static analysis, race detection ,benchmarks, error-path tests,and reviwable commits
+3) debugging with logs ,beakingpoints ,stack traces,and minimal reproducible cases.
+
+..practise: test business rules,handlers,middleware,validation,and failure responses
+..evidance: green automed chacks and a shirt test strategy describing coverd risks and know gaps
+
+ترجم اليوم الخامس
+
+day 5 integration and review
+
+1 .complate the weekiy deliverable, run the full check suite ,review the API contract and remove dead code
+2 .Demonstrate the service explane one design choice recevie review feedback,and remediate critical findings
+Practice: complate weekly task 1 from the companion assessment document .
+Evidance: Tagged release demonstration,score sheet , and improvement notes.

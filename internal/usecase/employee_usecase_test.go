@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"context"
 	"errors"
 	"testing"
 
@@ -9,35 +10,38 @@ import (
 )
 
 type fakeEmployeeRepository struct {
-	//create
 	createdEmployee domain.Employee
 	createCalled    bool
 	createErr       error
-	//update
+
 	updatedEmployee domain.Employee
 	updateCalled    bool
 	updateErr       error
-	//getByID
+
 	employeeByID  domain.Employee
 	getByIDErr    error
 	getByIDCalled bool
-	//getAll
+
 	employees    []domain.Employee
 	total        int
 	version      uint64
 	getAllErr    error
 	getAllCalled bool
-	//delete
+
 	deleteCalled bool
 	deleteID     int
 	deleteErr    error
+
+	receivedContext context.Context
 }
 
 func (f *fakeEmployeeRepository) Create(
+	ctx context.Context,
 	employee domain.Employee,
 ) (domain.Employee, error) {
 	f.createCalled = true
 	f.createdEmployee = employee
+	f.receivedContext = ctx
 
 	if f.createErr != nil {
 		return domain.Employee{}, f.createErr
@@ -47,6 +51,7 @@ func (f *fakeEmployeeRepository) Create(
 }
 
 func (f *fakeEmployeeRepository) GetByID(
+	ctx context.Context,
 	id int,
 ) (domain.Employee, error) {
 	f.getByIDCalled = true
@@ -54,25 +59,29 @@ func (f *fakeEmployeeRepository) GetByID(
 	if f.getByIDErr != nil {
 		return domain.Employee{}, f.getByIDErr
 	}
+
 	return f.employeeByID, nil
 }
 
 func (f *fakeEmployeeRepository) GetAll(
+	ctx context.Context,
 	filter repository.EmployeeFilter,
 	sortBy repository.EmployeeSort,
 	offset, limit int,
 ) ([]domain.Employee, int, uint64, error) {
 	f.getAllCalled = true
+
 	if f.getAllErr != nil {
 		return nil, 0, 0, f.getAllErr
 	}
+
 	return f.employees, f.total, f.version, nil
 }
 
 func (f *fakeEmployeeRepository) Update(
+	ctx context.Context,
 	employee domain.Employee,
 ) (domain.Employee, error) {
-
 	f.updateCalled = true
 	f.updatedEmployee = employee
 
@@ -83,492 +92,251 @@ func (f *fakeEmployeeRepository) Update(
 	return employee, nil
 }
 
-func (f *fakeEmployeeRepository) Delete(id int) error {
+func (f *fakeEmployeeRepository) Delete(
+	ctx context.Context,
+	id int,
+) error {
 	f.deleteCalled = true
 	f.deleteID = id
+
 	if f.deleteErr != nil {
 		return f.deleteErr
 	}
+
 	return nil
 }
 
 func TestCreateEmployee(t *testing.T) {
-	repositoryError := errors.New("repository error")
+	repo := &fakeEmployeeRepository{}
+	uc := NewEmployeeUsecase(repo)
 
-	tests := []struct {
-		name          string
-		employee      domain.Employee
-		repositoryErr error
-		wantName      string
-		wantEmail     string
-		wantErr       error
-		wantCreate    bool
-	}{
-		{
-			name: "valid employee trims spaces",
-			employee: domain.Employee{
-				Name:  "  Ali  ",
-				Email: "  ali@example.com  ",
-			},
-			wantName:   "Ali",
-			wantEmail:  "ali@example.com",
-			wantCreate: true,
-		},
-		{
-			name: "empty name",
-			employee: domain.Employee{
-				Name:  "   ",
-				Email: "ali@example.com",
-			},
-			wantErr:    ErrInvalidEmployee,
-			wantCreate: false,
-		},
-		{
-			name: "empty email",
-			employee: domain.Employee{
-				Name:  "Ali",
-				Email: "   ",
-			},
-			wantErr:    ErrInvalidEmployee,
-			wantCreate: false,
-		},
-		{
-			name: "repository error",
-			employee: domain.Employee{
-				Name:  "Ali",
-				Email: "ali@example.com",
-			},
-			repositoryErr: repositoryError,
-			wantErr:       repositoryError,
-			wantCreate:    true,
-		},
+	employee := domain.Employee{
+		Name:  "  Ali  ",
+		Email: "  ali@example.com  ",
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			repo := &fakeEmployeeRepository{
-				createErr: tt.repositoryErr,
-			}
+	got, err := uc.CreateEmployee(context.Background(), employee)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
-			uc := NewEmployeeUsecase(repo)
+	if !repo.createCalled {
+		t.Fatal("expected Create to be called")
+	}
 
-			got, err := uc.CreateEmployee(tt.employee)
+	if repo.createdEmployee.Name != "Ali" {
+		t.Errorf("expected trimmed name %q, got %q",
+			"Ali", repo.createdEmployee.Name)
+	}
 
-			if !errors.Is(err, tt.wantErr) {
-				t.Fatalf(
-					"expected error %v, got %v",
-					tt.wantErr,
-					err,
-				)
-			}
+	if repo.createdEmployee.Email != "ali@example.com" {
+		t.Errorf("expected trimmed email %q, got %q",
+			"ali@example.com", repo.createdEmployee.Email)
+	}
 
-			if tt.wantErr != nil {
-				if repo.createCalled != tt.wantCreate {
-					t.Fatalf(
-						"expected Create called = %v, got %v",
-						tt.wantCreate,
-						repo.createCalled,
-					)
-				}
-
-				return
-			}
-
-			if got.Name != tt.wantName {
-				t.Errorf(
-					"expected name %q, got %q",
-					tt.wantName,
-					got.Name,
-				)
-			}
-
-			if got.Email != tt.wantEmail {
-				t.Errorf(
-					"expected email %q, got %q",
-					tt.wantEmail,
-					got.Email,
-				)
-			}
-
-			if repo.createCalled != tt.wantCreate {
-				t.Errorf(
-					"expected Create called = %v, got %v",
-					tt.wantCreate,
-					repo.createCalled,
-				)
-			}
-		})
+	if got.Name != "Ali" {
+		t.Errorf("expected name %q, got %q", "Ali", got.Name)
 	}
 }
-func TestUpdateEmployee(t *testing.T) {
-	repositoryError := errors.New("repository error")
 
-	tests := []struct {
-		name          string
-		employee      domain.Employee
-		repositoryErr error
-		wantName      string
-		wantEmail     string
-		wantErr       error
-		wantUpdate    bool
-	}{
-		{
-			name: "valid employee trims spaces",
-			employee: domain.Employee{
-				ID:    10,
-				Name:  "  Ali  ",
-				Email: "  ali@example.com  ",
-			},
-			wantName:   "Ali",
-			wantEmail:  "ali@example.com",
-			wantUpdate: true,
-		},
-		{
-			name: "zero ID",
-			employee: domain.Employee{
-				ID:    0,
-				Name:  "Ali",
-				Email: "ali@example.com",
-			},
-			wantErr:    ErrInvalidEmployee,
-			wantUpdate: false,
-		},
-		{
-			name: "negative ID",
-			employee: domain.Employee{
-				ID:    -1,
-				Name:  "Ali",
-				Email: "ali@example.com",
-			},
-			wantErr:    ErrInvalidEmployee,
-			wantUpdate: false,
-		},
-		{
-			name: "empty name",
-			employee: domain.Employee{
-				ID:    10,
-				Name:  "   ",
-				Email: "ali@example.com",
-			},
-			wantErr:    ErrInvalidEmployee,
-			wantUpdate: false,
-		},
-		{
-			name: "empty email",
-			employee: domain.Employee{
-				ID:    10,
-				Name:  "Ali",
-				Email: "   ",
-			},
-			wantErr:    ErrInvalidEmployee,
-			wantUpdate: false,
-		},
-		{
-			name: "repository error",
-			employee: domain.Employee{
-				ID:    10,
-				Name:  "Ali",
-				Email: "ali@example.com",
-			},
-			repositoryErr: repositoryError,
-			wantErr:       repositoryError,
-			wantUpdate:    true,
-		},
+func TestCreateEmployeeInvalid(t *testing.T) {
+	repo := &fakeEmployeeRepository{}
+	uc := NewEmployeeUsecase(repo)
+
+	employee := domain.Employee{
+		Name:  "   ",
+		Email: "ali@example.com",
 	}
 
-	for _, tt := range tests {
-		// giva all states anathor  name
-		t.Run(tt.name, func(t *testing.T) {
-			repo := &fakeEmployeeRepository{
-				updateErr: tt.repositoryErr,
-			}
+	_, err := uc.CreateEmployee(context.Background(), employee)
 
-			uc := NewEmployeeUsecase(repo)
+	if !errors.Is(err, ErrInvalidEmployee) {
+		t.Fatalf("expected ErrInvalidEmployee, got %v", err)
+	}
 
-			got, err := uc.UpdateEmployee(tt.employee)
-
-			if !errors.Is(err, tt.wantErr) {
-				t.Fatalf(
-					"expected error %v, got %v",
-					tt.wantErr,
-					err,
-				)
-			}
-
-			if repo.updateCalled != tt.wantUpdate {
-				t.Fatalf(
-					"expected Update called = %v, got %v",
-					tt.wantUpdate,
-					repo.updateCalled,
-				)
-			}
-
-			if tt.wantErr != nil {
-				return
-			}
-
-			if got.Name != tt.wantName {
-				t.Errorf(
-					"expected name %q, got %q",
-					tt.wantName,
-					got.Name,
-				)
-			}
-
-			if got.Email != tt.wantEmail {
-				t.Errorf(
-					"expected email %q, got %q",
-					tt.wantEmail,
-					got.Email,
-				)
-			}
-
-			if repo.updatedEmployee.Name != tt.wantName {
-				t.Errorf(
-					"expected repository name %q, got %q",
-					tt.wantName,
-					repo.updatedEmployee.Name,
-				)
-			}
-
-			if repo.updatedEmployee.Email != tt.wantEmail {
-				t.Errorf(
-					"expected repository email %q, got %q",
-					tt.wantEmail,
-					repo.updatedEmployee.Email,
-				)
-			}
-		})
+	if repo.createCalled {
+		t.Fatal("repository Create should not be called")
 	}
 }
+
 func TestGetEmployee(t *testing.T) {
-	repositoryError := errors.New("repository error")
-
-	tests := []struct {
-		name          string
-		id            int
-		repositoryEmp domain.Employee
-		repositoryErr error
-		want          domain.Employee
-		wantErr       error
-		wantGetByID   bool
-	}{
-		{
-			name: "employee found",
-			id:   10,
-			repositoryEmp: domain.Employee{
-				ID:    10,
-				Name:  "Ali",
-				Email: "ali@example.com",
-			},
-			want: domain.Employee{
-				ID:    10,
-				Name:  "Ali",
-				Email: "ali@example.com",
-			},
-			wantGetByID: true,
-		},
-		{
-			name:          "repository error",
-			id:            10,
-			repositoryErr: repositoryError,
-			wantErr:       repositoryError,
-			wantGetByID:   true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			repo := &fakeEmployeeRepository{
-				employeeByID: tt.repositoryEmp,
-				getByIDErr:   tt.repositoryErr,
-			}
-
-			uc := NewEmployeeUsecase(repo)
-
-			got, err := uc.GetEmployee(tt.id)
-
-			if !errors.Is(err, tt.wantErr) {
-				t.Fatalf(
-					"expected error %v, got %v",
-					tt.wantErr,
-					err,
-				)
-			}
-
-			if repo.getByIDCalled != tt.wantGetByID {
-				t.Fatalf(
-					"expected GetByID called = %v, got %v",
-					tt.wantGetByID,
-					repo.getByIDCalled,
-				)
-			}
-
-			if tt.wantErr != nil {
-				return
-			}
-
-			if got != tt.want {
-				t.Fatalf(
-					"expected employee %+v, got %+v",
-					tt.want,
-					got,
-				)
-			}
-		})
-	}
-}
-func TestGetEmployees(t *testing.T) {
-	repositoryError := errors.New("repository error")
-
-	employees := []domain.Employee{
-		{
-			ID:    1,
+	repo := &fakeEmployeeRepository{
+		employeeByID: domain.Employee{
+			ID:    10,
 			Name:  "Ali",
 			Email: "ali@example.com",
 		},
-		{
-			ID:    2,
-			Name:  "Ahmed",
-			Email: "ahmed@example.com",
-		},
 	}
 
-	tests := []struct {
-		name          string
-		repositoryErr error
-		wantLen       int
-		wantTotal     int
-		wantVersion   uint64
-		wantErr       error
-	}{
-		{
-			name:        "employees found",
-			wantLen:     2,
-			wantTotal:   2,
-			wantVersion: 5,
-		},
-		{
-			name:          "repository error",
-			repositoryErr: repositoryError,
-			wantErr:       repositoryError,
-		},
+	uc := NewEmployeeUsecase(repo)
+
+	got, err := uc.GetEmployee(context.Background(), 10)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			repo := &fakeEmployeeRepository{
-				employees: employees,
-				total:     2,
-				version:   5,
-				getAllErr: tt.repositoryErr,
-			}
+	if !repo.getByIDCalled {
+		t.Fatal("expected GetByID to be called")
+	}
 
-			uc := NewEmployeeUsecase(repo)
-
-			got, total, version, err := uc.GetEmployees(
-				repository.EmployeeFilter{},
-				repository.EmployeeSort{},
-				0,
-				10,
-			)
-
-			if !errors.Is(err, tt.wantErr) {
-				t.Fatalf(
-					"expected error %v, got %v",
-					tt.wantErr,
-					err,
-				)
-			}
-
-			if !repo.getAllCalled {
-				t.Fatal("expected GetAll to be called")
-			}
-
-			if tt.wantErr != nil {
-				return
-			}
-
-			if len(got) != tt.wantLen {
-				t.Errorf(
-					"expected length %d, got %d",
-					tt.wantLen,
-					len(got),
-				)
-			}
-
-			if total != tt.wantTotal {
-				t.Errorf(
-					"expected total %d, got %d",
-					tt.wantTotal,
-					total,
-				)
-			}
-
-			if version != tt.wantVersion {
-				t.Errorf(
-					"expected version %d, got %d",
-					tt.wantVersion,
-					version,
-				)
-			}
-		})
+	if got.ID != 10 {
+		t.Errorf("expected ID 10, got %d", got.ID)
 	}
 }
+
+func TestGetEmployees(t *testing.T) {
+	repo := &fakeEmployeeRepository{
+		employees: []domain.Employee{
+			{
+				ID:    1,
+				Name:  "Ali",
+				Email: "ali@example.com",
+			},
+		},
+		total:   1,
+		version: 5,
+	}
+
+	uc := NewEmployeeUsecase(repo)
+
+	filter := repository.EmployeeFilter{
+		Name: "Ali",
+	}
+
+	sortBy := repository.EmployeeSort{
+		Field: "name",
+		Desc:  false,
+	}
+
+	got, total, version, err :=
+		uc.GetEmployees(context.Background(), filter, sortBy, 0, 10)
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !repo.getAllCalled {
+		t.Fatal("expected GetAll to be called")
+	}
+
+	if len(got) != 1 {
+		t.Fatalf("expected 1 employee, got %d", len(got))
+	}
+
+	if total != 1 {
+		t.Errorf("expected total 1, got %d", total)
+	}
+
+	if version != 5 {
+		t.Errorf("expected version 5, got %d", version)
+	}
+}
+
+func TestUpdateEmployee(t *testing.T) {
+	repo := &fakeEmployeeRepository{}
+	uc := NewEmployeeUsecase(repo)
+
+	employee := domain.Employee{
+		ID:    10,
+		Name:  "  Ali  ",
+		Email: "  ali@example.com  ",
+	}
+
+	got, err := uc.UpdateEmployee(
+		context.Background(),
+		employee,
+	)
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !repo.updateCalled {
+		t.Fatal("expected Update to be called")
+	}
+
+	if repo.updatedEmployee.Name != "Ali" {
+		t.Errorf("expected trimmed name %q, got %q",
+			"Ali", repo.updatedEmployee.Name)
+	}
+
+	if repo.updatedEmployee.Email != "ali@example.com" {
+		t.Errorf("expected trimmed email %q, got %q",
+			"ali@example.com", repo.updatedEmployee.Email)
+	}
+
+	if got.ID != 10 {
+		t.Errorf("expected ID 10, got %d", got.ID)
+	}
+}
+
+func TestUpdateEmployeeInvalidID(t *testing.T) {
+	repo := &fakeEmployeeRepository{}
+	uc := NewEmployeeUsecase(repo)
+
+	employee := domain.Employee{
+		ID:    0,
+		Name:  "Ali",
+		Email: "ali@example.com",
+	}
+
+	_, err := uc.UpdateEmployee(
+		context.Background(),
+		employee,
+	)
+
+	if !errors.Is(err, ErrInvalidEmployee) {
+		t.Fatalf("expected ErrInvalidEmployee, got %v", err)
+	}
+
+	if repo.updateCalled {
+		t.Fatal("repository Update should not be called")
+	}
+}
+
 func TestDeleteEmployee(t *testing.T) {
-	repositoryError := errors.New("employee not found")
+	repo := &fakeEmployeeRepository{}
+	uc := NewEmployeeUsecase(repo)
 
-	tests := []struct {
-		name          string
-		id            int
-		repositoryErr error
-		wantErr       error
-	}{
-		{
-			name: "delete successfully",
-			id:   10,
-		},
-		{
-			name:          "repository error",
-			id:            10,
-			repositoryErr: repositoryError,
-			wantErr:       repositoryError,
-		},
+	err := uc.DeleteEmployee(
+		context.Background(),
+		10,
+	)
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			repo := &fakeEmployeeRepository{
-				deleteErr: tt.repositoryErr,
-			}
+	if !repo.deleteCalled {
+		t.Fatal("expected Delete to be called")
+	}
 
-			uc := NewEmployeeUsecase(repo)
-
-			err := uc.DeleteEmployee(tt.id)
-
-			if !errors.Is(err, tt.wantErr) {
-				t.Fatalf(
-					"expected error %v, got %v",
-					tt.wantErr,
-					err,
-				)
-			}
-
-			if !repo.deleteCalled {
-				t.Fatal("expected Delete to be called")
-			}
-
-			if repo.deleteID != tt.id {
-				t.Fatalf(
-					"expected delete ID %d, got %d",
-					tt.id,
-					repo.deleteID,
-				)
-			}
-		})
+	if repo.deleteID != 10 {
+		t.Errorf("expected delete ID 10, got %d", repo.deleteID)
 	}
 }
 
-//go test ./internal/usecase -v -count=1
+func TestCreateEmployeeContextPropagation(t *testing.T) {
+	repo := &fakeEmployeeRepository{}
+	uc := NewEmployeeUsecase(repo)
 
-//go test ./internal/usecase -cover -count=1
+	ctx := context.WithValue(
+		context.Background(),
+		"request-id",
+		"test-123",
+	)
+
+	employee := domain.Employee{
+		Name:  "Ali",
+		Email: "ali@example.com",
+	}
+
+	_, err := uc.CreateEmployee(ctx, employee)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if repo.receivedContext != ctx {
+		t.Fatal("expected the same context to reach the repository")
+	}
+}

@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"context"
 	"errors"
 
 	"backend-api/internal/domain"
@@ -18,13 +19,14 @@ type EmployeeSort struct {
 }
 
 type EmployeeRepository interface {
-	Create(employee domain.Employee) (domain.Employee, error)
-	GetByID(id int) (domain.Employee, error)
+	Create(ctx context.Context, employee domain.Employee) (domain.Employee, error)
+	GetByID(ctx context.Context, id int) (domain.Employee, error)
 	GetAll(
+		ctx context.Context,
 		filter EmployeeFilter,
 		sort EmployeeSort,
 		offset, limit int,
 	) ([]domain.Employee, int, uint64, error)
-	Update(employee domain.Employee) (domain.Employee, error)
-	Delete(id int) error
+	Update(ctx context.Context, employee domain.Employee) (domain.Employee, error)
+	Delete(ctx context.Context, id int) error
 }

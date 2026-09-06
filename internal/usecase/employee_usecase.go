@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"context"
 	"errors"
 	"strings"
 
@@ -20,7 +21,10 @@ func NewEmployeeUsecase(repo repository.EmployeeRepository) *EmployeeUsecase {
 	}
 }
 
-func (u *EmployeeUsecase) CreateEmployee(employee domain.Employee) (domain.Employee, error) {
+func (u *EmployeeUsecase) CreateEmployee(
+	ctx context.Context,
+	employee domain.Employee,
+) (domain.Employee, error) {
 	employee.Name = strings.TrimSpace(employee.Name)
 	employee.Email = strings.TrimSpace(employee.Email)
 
@@ -28,21 +32,21 @@ func (u *EmployeeUsecase) CreateEmployee(employee domain.Employee) (domain.Emplo
 		return domain.Employee{}, ErrInvalidEmployee
 	}
 
-	return u.repo.Create(employee)
+	return u.repo.Create(ctx, employee)
 }
 
-func (u *EmployeeUsecase) GetEmployee(id int) (domain.Employee, error) {
-	return u.repo.GetByID(id)
+func (u *EmployeeUsecase) GetEmployee(ctx context.Context, id int) (domain.Employee, error) {
+	return u.repo.GetByID(ctx, id)
 }
 
-func (u *EmployeeUsecase) GetEmployees(filter repository.EmployeeFilter,
+func (u *EmployeeUsecase) GetEmployees(ctx context.Context, filter repository.EmployeeFilter,
 	sortBy repository.EmployeeSort, offset, limit int) (
 
 	[]domain.Employee, int, uint64, error) {
-	return u.repo.GetAll(filter, sortBy, offset, limit)
+	return u.repo.GetAll(ctx, filter, sortBy, offset, limit)
 }
 
-func (u *EmployeeUsecase) UpdateEmployee(employee domain.Employee) (domain.Employee, error) {
+func (u *EmployeeUsecase) UpdateEmployee(ctx context.Context, employee domain.Employee) (domain.Employee, error) {
 	employee.Name = strings.TrimSpace(employee.Name)
 	employee.Email = strings.TrimSpace(employee.Email)
 
@@ -54,9 +58,9 @@ func (u *EmployeeUsecase) UpdateEmployee(employee domain.Employee) (domain.Emplo
 		return domain.Employee{}, ErrInvalidEmployee
 	}
 
-	return u.repo.Update(employee)
+	return u.repo.Update(ctx, employee)
 }
 
-func (u *EmployeeUsecase) DeleteEmployee(id int) error {
-	return u.repo.Delete(id)
+func (u *EmployeeUsecase) DeleteEmployee(ctx context.Context, id int) error {
+	return u.repo.Delete(ctx, id)
 }

@@ -1,6 +1,7 @@
 package postgres
 
 import (
+	"context"
 	"errors"
 
 	"gorm.io/gorm"
@@ -21,10 +22,10 @@ func NewEmployeeRepository(db *gorm.DB) *EmployeeRepository {
 
 // Create creates a new employee in PostgreSQL.
 func (r *EmployeeRepository) Create(
+	ctx context.Context,
 	employee domain.Employee,
 ) (domain.Employee, error) {
-
-	result := r.db.Create(&employee)
+	result := r.db.WithContext(ctx).Create(&employee)
 
 	if result.Error != nil {
 		return domain.Employee{}, result.Error
@@ -35,12 +36,12 @@ func (r *EmployeeRepository) Create(
 
 // GetByID returns one employee by ID.
 func (r *EmployeeRepository) GetByID(
+	ctx context.Context,
 	id int,
 ) (domain.Employee, error) {
-
 	var employee domain.Employee
 
-	result := r.db.
+	result := r.db.WithContext(ctx).
 		Where("id = ?", id).
 		First(&employee)
 
@@ -57,12 +58,13 @@ func (r *EmployeeRepository) GetByID(
 
 // GetAll returns employees with filtering, sorting and pagination.
 func (r *EmployeeRepository) GetAll(
+	ctx context.Context,
 	filter repository.EmployeeFilter,
 	sortBy repository.EmployeeSort,
 	offset, limit int,
 ) ([]domain.Employee, int, uint64, error) {
-
-	query := r.db.Model(&domain.Employee{})
+	query := r.db.WithContext(ctx).
+		Model(&domain.Employee{})
 
 	// Filtering
 	if filter.Name != "" {
@@ -120,10 +122,10 @@ func (r *EmployeeRepository) GetAll(
 
 // Update updates an existing employee.
 func (r *EmployeeRepository) Update(
+	ctx context.Context,
 	employee domain.Employee,
 ) (domain.Employee, error) {
-
-	result := r.db.
+	result := r.db.WithContext(ctx).
 		Model(&domain.Employee{}).
 		Where("id = ?", employee.ID).
 		Updates(map[string]interface{}{
@@ -140,13 +142,15 @@ func (r *EmployeeRepository) Update(
 		return domain.Employee{}, domain.ErrEmployeeNotFound
 	}
 
-	return r.GetByID(employee.ID)
+	return r.GetByID(ctx, employee.ID)
 }
 
 // Delete deletes an employee by ID.
-func (r *EmployeeRepository) Delete(id int) error {
-
-	result := r.db.
+func (r *EmployeeRepository) Delete(
+	ctx context.Context,
+	id int,
+) error {
+	result := r.db.WithContext(ctx).
 		Delete(&domain.Employee{}, id)
 
 	if result.Error != nil {

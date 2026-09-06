@@ -67,7 +67,7 @@ func (h *Handler) CreateEmployee(w http.ResponseWriter, r *http.Request) {
 		Department: req.Department,
 	}
 	//call usecase to create employee
-	created, err := h.usecase.CreateEmployee(employee)
+	created, err := h.usecase.CreateEmployee(r.Context(), employee)
 	if err != nil {
 		if errors.Is(err, usecase.ErrInvalidEmployee) {
 			response.WriteError(
@@ -164,7 +164,9 @@ func (h *Handler) GetEmployees(w http.ResponseWriter, r *http.Request) {
 	offset := (page - 1) * pageSize
 
 	//call usecase to get employees with filter, sort and pagination
+
 	employees, total, version, err := h.usecase.GetEmployees(
+		r.Context(),
 		filter,
 		sortBy,
 		offset,
@@ -238,7 +240,7 @@ func (h *Handler) GetEmployee(w http.ResponseWriter, r *http.Request) {
 		)
 		return
 	}
-	employee, err := h.usecase.GetEmployee(id)
+	employee, err := h.usecase.GetEmployee(r.Context(), id)
 	if err != nil {
 		if errors.Is(err, repository.ErrEmployeeNotFound) {
 			response.WriteError(
@@ -293,7 +295,7 @@ func (h *Handler) UpdateEmployee(w http.ResponseWriter, r *http.Request) {
 		Department: req.Department,
 	}
 
-	updated, err := h.usecase.UpdateEmployee(employee)
+	updated, err := h.usecase.UpdateEmployee(r.Context(), employee)
 	if err != nil {
 		switch {
 		case errors.Is(err, usecase.ErrInvalidEmployee):
@@ -346,7 +348,7 @@ func (h *Handler) DeleteEmployee(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = h.usecase.DeleteEmployee(id)
+	err = h.usecase.DeleteEmployee(r.Context(), id)
 	if err != nil {
 		if errors.Is(err, repository.ErrEmployeeNotFound) {
 			response.WriteError(
