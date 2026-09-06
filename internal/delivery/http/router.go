@@ -15,7 +15,6 @@ func NewRouter(h *handler.Handler) http.Handler {
 	apiMux := http.NewServeMux()
 
 	apiMux.HandleFunc("GET /health", h.Health)
-	//apiMux.HandleFunc("GET /panic-test", h.PanicTest)
 
 	apiMux.Handle(
 		"POST /api/v1/employees",

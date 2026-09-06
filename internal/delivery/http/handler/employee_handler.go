@@ -404,7 +404,3 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) DeleteTask(w http.ResponseWriter, r *http.Request) {
 	h.taskHandler.Delete(w, r)
 }
-
-//func (h *Handler) PanicTest(w http.ResponseWriter, r *http.Request) {
-//	panic("test panic")
-//}

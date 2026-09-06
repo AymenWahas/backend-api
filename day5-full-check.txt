@@ -1,0 +1,258 @@
+]633;E;echo "========================================";d4318227-1cd7-4ad9-bed0-8e656a851d48]633;C========================================
+DAY 5 - FULL CHECK SUITE
+========================================
+
+DATE: Sun Sep  6 04:07:02 PM +03 2026
+
+========== 1. PROJECT TREE ==========
+.
+├── certs
+│   ├── cert.pem
+│   ├── key.pem
+│   └── openssl.cnf
+├── cmd
+│   └── api
+│       └── main.go
+├── day4-all-go-code.txt
+├── day4-project-tree.txt
+├── day5-full-check.txt
+├── docs
+│   ├── day2-curl-collection.sh
+│   ├── openapi.json
+│   └── openapi.yaml
+├── Evidence
+│   ├── 4.txt
+│   ├── day1-evidence.txt
+│   ├── day2.txt
+│   └── day 3.txt
+├── go.mod
+├── go.sum
+├── internal
+│   ├── config
+│   │   └── config.go
+│   ├── database
+│   │   └── postgres.go
+│   ├── delivery
+│   │   └── http
+│   ├── domain
+│   │   ├── employee.go
+│   │   ├── errors.go
+│   │   ├── project.go
+│   │   └── task.go
+│   ├── repository
+│   │   ├── employee_repository.go
+│   │   ├── memory
+│   │   ├── postgres
+│   │   ├── project_repository.go
+│   │   └── task_repository.go
+│   └── usecase
+│       ├── employee_usecase.go
+│       ├── employee_usecase_test.go
+│       ├── project_usecase.go
+│       └── task_usecase.go
+└── up to git .txt
+
+16 directories, 30 files
+
+========== 2. GO MOD ==========
+module backend-api
+
+go 1.26.5
+
+require (
+	github.com/jackc/pgx/v5 v5.10.0 // indirect
+	gorm.io/driver/postgres v1.6.2
+	gorm.io/gorm v1.31.2
+)
+
+require (
+	github.com/google/uuid v1.6.0
+	github.com/swaggest/swgui v1.8.9
+)
+
+require (
+	github.com/jackc/pgpassfile v1.0.0 // indirect
+	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
+	github.com/jackc/puddle/v2 v2.2.2 // indirect
+	github.com/jinzhu/inflection v1.0.0 // indirect
+	github.com/jinzhu/now v1.1.5 // indirect
+	github.com/shurcooL/httpgzip v0.0.0-20190720172056-320755c1c1b0 // indirect
+	golang.org/x/net v0.8.0 // indirect
+	golang.org/x/sync v0.17.0 // indirect
+	golang.org/x/text v0.29.0 // indirect
+)
+
+========== 3. GO VERSION ==========
+go version go1.26.5 linux/amd64
+
+========== 4. GO TEST (ALL) ==========
+?   	backend-api/cmd/api	[no test files]
+?   	backend-api/internal/config	[no test files]
+?   	backend-api/internal/database	[no test files]
+?   	backend-api/internal/delivery/http	[no test files]
+=== RUN   TestCreateEmployeeRequest_Validate
+=== RUN   TestCreateEmployeeRequest_Validate/valid_employee
+=== RUN   TestCreateEmployeeRequest_Validate/empty_name
+=== RUN   TestCreateEmployeeRequest_Validate/empty_email
+=== RUN   TestCreateEmployeeRequest_Validate/name_contains_only_spaces
+=== RUN   TestCreateEmployeeRequest_Validate/email_contains_only_spaces
+=== RUN   TestCreateEmployeeRequest_Validate/department_is_optional
+--- PASS: TestCreateEmployeeRequest_Validate (0.00s)
+    --- PASS: TestCreateEmployeeRequest_Validate/valid_employee (0.00s)
+    --- PASS: TestCreateEmployeeRequest_Validate/empty_name (0.00s)
+    --- PASS: TestCreateEmployeeRequest_Validate/empty_email (0.00s)
+    --- PASS: TestCreateEmployeeRequest_Validate/name_contains_only_spaces (0.00s)
+    --- PASS: TestCreateEmployeeRequest_Validate/email_contains_only_spaces (0.00s)
+    --- PASS: TestCreateEmployeeRequest_Validate/department_is_optional (0.00s)
+=== RUN   TestUpdateEmployeeRequest_Validate
+=== RUN   TestUpdateEmployeeRequest_Validate/valid_employee
+=== RUN   TestUpdateEmployeeRequest_Validate/empty_name
+=== RUN   TestUpdateEmployeeRequest_Validate/empty_email
+=== RUN   TestUpdateEmployeeRequest_Validate/name_contains_only_spaces
+=== RUN   TestUpdateEmployeeRequest_Validate/email_contains_only_spaces
+=== RUN   TestUpdateEmployeeRequest_Validate/department_is_optional
+--- PASS: TestUpdateEmployeeRequest_Validate (0.00s)
+    --- PASS: TestUpdateEmployeeRequest_Validate/valid_employee (0.00s)
+    --- PASS: TestUpdateEmployeeRequest_Validate/empty_name (0.00s)
+    --- PASS: TestUpdateEmployeeRequest_Validate/empty_email (0.00s)
+    --- PASS: TestUpdateEmployeeRequest_Validate/name_contains_only_spaces (0.00s)
+    --- PASS: TestUpdateEmployeeRequest_Validate/email_contains_only_spaces (0.00s)
+    --- PASS: TestUpdateEmployeeRequest_Validate/department_is_optional (0.00s)
+PASS
+ok  	backend-api/internal/delivery/http/dto	0.002s
+=== RUN   TestHealth
+--- PASS: TestHealth (0.00s)
+=== RUN   TestCreateEmployee_TableDriven
+=== RUN   TestCreateEmployee_TableDriven/valid_employee
+=== RUN   TestCreateEmployee_TableDriven/repository_error
+=== RUN   TestCreateEmployee_TableDriven/empty_name
+=== RUN   TestCreateEmployee_TableDriven/invalid_JSON
+--- PASS: TestCreateEmployee_TableDriven (0.00s)
+    --- PASS: TestCreateEmployee_TableDriven/valid_employee (0.00s)
+    --- PASS: TestCreateEmployee_TableDriven/repository_error (0.00s)
+    --- PASS: TestCreateEmployee_TableDriven/empty_name (0.00s)
+    --- PASS: TestCreateEmployee_TableDriven/invalid_JSON (0.00s)
+PASS
+ok  	backend-api/internal/delivery/http/handler	0.005s
+=== RUN   TestAcceptJSON
+=== RUN   TestAcceptJSON/application_json
+=== RUN   TestAcceptJSON/wildcard
+=== RUN   TestAcceptJSON/empty_accept
+=== RUN   TestAcceptJSON/unsupported_accept
+--- PASS: TestAcceptJSON (0.00s)
+    --- PASS: TestAcceptJSON/application_json (0.00s)
+    --- PASS: TestAcceptJSON/wildcard (0.00s)
+    --- PASS: TestAcceptJSON/empty_accept (0.00s)
+    --- PASS: TestAcceptJSON/unsupported_accept (0.00s)
+=== RUN   TestJSONContentType
+=== RUN   TestJSONContentType/application_json
+=== RUN   TestJSONContentType/application_json_with_charset
+=== RUN   TestJSONContentType/empty_content_type
+=== RUN   TestJSONContentType/text_html
+--- PASS: TestJSONContentType (0.00s)
+    --- PASS: TestJSONContentType/application_json (0.00s)
+    --- PASS: TestJSONContentType/application_json_with_charset (0.00s)
+    --- PASS: TestJSONContentType/empty_content_type (0.00s)
+    --- PASS: TestJSONContentType/text_html (0.00s)
+=== RUN   TestRequestID
+=== RUN   TestRequestID/existing_request_id
+=== RUN   TestRequestID/generates_request_id
+--- PASS: TestRequestID (0.00s)
+    --- PASS: TestRequestID/existing_request_id (0.00s)
+    --- PASS: TestRequestID/generates_request_id (0.00s)
+=== RUN   TestRecovery
+2026/09/06 16:07:03 ERROR panic recovered error="test panic" method=GET path=/panic request_id=""
+--- PASS: TestRecovery (0.00s)
+=== RUN   TestTimeout
+--- PASS: TestTimeout (0.01s)
+=== RUN   TestRequestLogger
+2026/09/06 16:07:03 INFO request completed method=POST path=/employees status=201 duration=927ns request_id=""
+--- PASS: TestRequestLogger (0.00s)
+PASS
+ok  	backend-api/internal/delivery/http/middleware	0.016s
+?   	backend-api/internal/delivery/http/response	[no test files]
+?   	backend-api/internal/domain	[no test files]
+?   	backend-api/internal/repository	[no test files]
+?   	backend-api/internal/repository/memory	[no test files]
+?   	backend-api/internal/repository/postgres	[no test files]
+=== RUN   TestCreateEmployee
+=== RUN   TestCreateEmployee/valid_employee_trims_spaces
+=== RUN   TestCreateEmployee/empty_name
+=== RUN   TestCreateEmployee/empty_email
+=== RUN   TestCreateEmployee/repository_error
+--- PASS: TestCreateEmployee (0.00s)
+    --- PASS: TestCreateEmployee/valid_employee_trims_spaces (0.00s)
+    --- PASS: TestCreateEmployee/empty_name (0.00s)
+    --- PASS: TestCreateEmployee/empty_email (0.00s)
+    --- PASS: TestCreateEmployee/repository_error (0.00s)
+=== RUN   TestUpdateEmployee
+=== RUN   TestUpdateEmployee/valid_employee_trims_spaces
+=== RUN   TestUpdateEmployee/zero_ID
+=== RUN   TestUpdateEmployee/negative_ID
+=== RUN   TestUpdateEmployee/empty_name
+=== RUN   TestUpdateEmployee/empty_email
+=== RUN   TestUpdateEmployee/repository_error
+--- PASS: TestUpdateEmployee (0.00s)
+    --- PASS: TestUpdateEmployee/valid_employee_trims_spaces (0.00s)
+    --- PASS: TestUpdateEmployee/zero_ID (0.00s)
+    --- PASS: TestUpdateEmployee/negative_ID (0.00s)
+    --- PASS: TestUpdateEmployee/empty_name (0.00s)
+    --- PASS: TestUpdateEmployee/empty_email (0.00s)
+    --- PASS: TestUpdateEmployee/repository_error (0.00s)
+=== RUN   TestGetEmployee
+=== RUN   TestGetEmployee/employee_found
+=== RUN   TestGetEmployee/repository_error
+--- PASS: TestGetEmployee (0.00s)
+    --- PASS: TestGetEmployee/employee_found (0.00s)
+    --- PASS: TestGetEmployee/repository_error (0.00s)
+=== RUN   TestGetEmployees
+=== RUN   TestGetEmployees/employees_found
+=== RUN   TestGetEmployees/repository_error
+--- PASS: TestGetEmployees (0.00s)
+    --- PASS: TestGetEmployees/employees_found (0.00s)
+    --- PASS: TestGetEmployees/repository_error (0.00s)
+=== RUN   TestDeleteEmployee
+=== RUN   TestDeleteEmployee/delete_successfully
+=== RUN   TestDeleteEmployee/repository_error
+--- PASS: TestDeleteEmployee (0.00s)
+    --- PASS: TestDeleteEmployee/delete_successfully (0.00s)
+    --- PASS: TestDeleteEmployee/repository_error (0.00s)
+PASS
+ok  	backend-api/internal/usecase	0.005s
+
+========== 5. GO TEST WITH RACE ==========
+?   	backend-api/cmd/api	[no test files]
+?   	backend-api/internal/config	[no test files]
+?   	backend-api/internal/database	[no test files]
+?   	backend-api/internal/delivery/http	[no test files]
+ok  	backend-api/internal/delivery/http/dto	1.013s
+ok  	backend-api/internal/delivery/http/handler	1.013s
+ok  	backend-api/internal/delivery/http/middleware	1.025s
+?   	backend-api/internal/delivery/http/response	[no test files]
+?   	backend-api/internal/domain	[no test files]
+?   	backend-api/internal/repository	[no test files]
+?   	backend-api/internal/repository/memory	[no test files]
+?   	backend-api/internal/repository/postgres	[no test files]
+ok  	backend-api/internal/usecase	1.013s
+
+========== 6. GO VET ==========
+
+========== 7. GOFMT ==========
+
+========== 8. GIT DIFF CHECK ==========
+
+========== 9. OPENAPI VALIDATION ==========
+✅ OpenAPI is valid JSON
+
+========== 10. CHECK DEAD CODE ==========
+Checking for unused functions...
+flag provided but not defined: -unused
+usage: go vet [build flags] [-vettool prog] [vet flags] [packages]
+Run 'go help vet' for details.
+Run 'go tool vet help' for a full list of flags and analyzers.
+Run 'go tool vet -help' for an overview.
+No unused code found
+
+========================================
+✅ FULL CHECK SUITE COMPLETE
+========================================
