@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	"gorm.io/gorm"
 
 	"backend-api/internal/domain"
@@ -19,6 +20,17 @@ func NewEmployeeRepository(db *gorm.DB) *EmployeeRepository {
 		db: db,
 	}
 }
+func mapEmployeeDBError(err error) error {
+	var pgErr *pgconn.PgError
+
+	if errors.As(err, &pgErr) {
+		if pgErr.Code == "23505" {
+			return domain.ErrEmployeeAlreadyExists
+		}
+	}
+
+	return err
+}
 
 // Create creates a new employee in PostgreSQL.
 func (r *EmployeeRepository) Create(
@@ -28,9 +40,8 @@ func (r *EmployeeRepository) Create(
 	result := r.db.WithContext(ctx).Create(&employee)
 
 	if result.Error != nil {
-		return domain.Employee{}, result.Error
+		return domain.Employee{}, mapEmployeeDBError(result.Error)
 	}
-
 	return employee, nil
 }
 
@@ -135,7 +146,7 @@ func (r *EmployeeRepository) Update(
 		})
 
 	if result.Error != nil {
-		return domain.Employee{}, result.Error
+		return domain.Employee{}, mapEmployeeDBError(result.Error)
 	}
 
 	if result.RowsAffected == 0 {
@@ -154,7 +165,7 @@ func (r *EmployeeRepository) Delete(
 		Delete(&domain.Employee{}, id)
 
 	if result.Error != nil {
-		return result.Error
+		return mapEmployeeDBError(result.Error)
 	}
 
 	if result.RowsAffected == 0 {

@@ -60,7 +60,7 @@ func main() {
 
 	h := handler.NewHandler(employeeUC, projectUC, taskUC)
 	// Router
-	router := httpdelivery.NewRouter(h)
+	router := httpdelivery.NewRouter(h, cfg.RequestTimeout)
 
 	// Port
 	port := cfg.Port

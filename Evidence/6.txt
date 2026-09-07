@@ -1,0 +1,141 @@
+Day 6 — Relational Modeling & SQL
+
+
+
+ER Relationships    ✅
+employees
+    │
+    │ 1:N
+    ▼
+projects
+    │
+    │ 1:N
+    ▼
+tasks
+
+
+employees
+    │
+    │ M:N
+    ▼
+memberships
+    ▲
+    │
+projects
+
+
+tasks
+    │
+    │ M:N
+    ▼
+task_tags
+    ▲
+    │
+tags
+\\\\\\\\\\\\\\\
+migratiom file 
+migrations/
+├── 000001_add_workhub_fields_to_employees.up.sql
+├── 000001_add_workhub_fields_to_employees.down.sql
+├── 000002_add_workhub_fields_to_projects.up.sql
+├── 000002_add_workhub_fields_to_projects.down.sql
+├── 000003_add_workhub_fields_to_tasks.up.sql
+├── 000003_add_workhub_fields_to_tasks.down.sql
+├── 000004_create_memberships.up.sql
+├── 000004_create_memberships.down.sql
+├── 000005_create_tags.up.sql
+├── 000005_create_tags.down.sql
+├── 000006_create_task_tags.up.sql
+└── 000006_create_task_tags.down.sql
+
+
+\\\\\\\\\\\\\\\\
+Migration version
+migrate ... version 6
+
+
+|\\\\\\\\\\\\\\
+Database Schema
+employees
+projects
+tasks
+memberships
+tags
+task_tags
+
+
+#########
+Representative SQL Querie__
+
+ayman-wahas@ayman-wahas:~/backend-api$ psql -U postgres -d employee_db -h localhost -p 5434
+Password for user postgres: 
+psql (16.15 (Ubuntu 16.15-0ubuntu0.24.04.1), server 15.19)
+Type "help" for help.
+
+employee_db=# SELECT
+    p.id AS project_id,
+    p.name AS project_name,
+    t.id AS task_id,
+    t.title AS task_title
+FROM projects p
+JOIN tasks t
+    ON t.project_id = p.id;
+ project_id | project_name | task_id | task_title 
+------------+--------------+---------+------------
+          1 | My Project   |       1 | First Task
+(1 row)
+
+employee_db=# SELECT
+    e.id AS employee_id,
+    e.name AS employee_name,
+    p.id AS project_id,
+    p.name AS project_name,
+    m.role
+FROM employees e
+JOIN memberships m
+    ON m.employee_id = e.id
+JOIN projects p
+    ON p.id = m.project_id;
+ employee_id | employee_name | project_id | project_name | role 
+-------------+---------------+------------+--------------+------
+(0 rows)
+
+employee_db=# SELECT
+    t.id AS task_id,
+    t.title,
+    tg.name AS tag
+FROM tasks t
+JOIN task_tags tt
+    ON tt.task_id = t.id
+JOIN tags tg
+    ON tg.id = tt.tag_id;
+ task_id | title | tag 
+---------+-------+-----
+(0 rows)
+
+employee_db=# 
+||||||||||||||||
+
+# Constraint Tests 
+|||||||||||||||||
+employee_db=# BEGIN;
+
+INSERT INTO projects (name, description, owner_id)
+VALUES ('Invalid Project', 'FK test', 999999);
+
+ROLLBACK;
+BEGIN
+ERROR:  insert or update on table "projects" violates foreign key constraint "fk_projects_owner"
+DETAIL:  Key (owner_id)=(999999) is not present in table "employees".
+ROLLBACK
+employee_db=# BEGIN;
+
+INSERT INTO tasks (project_id, title, status)
+VALUES (999999, 'Invalid Task', 'pending');
+
+ROLLBACK;
+BEGIN
+ERROR:  insert or update on table "tasks" violates foreign key constraint "fk_projects_tasks"
+DETAIL:  Key (project_id)=(999999) is not present in table "projects".
+ROLLBACK
+employee_db=# 

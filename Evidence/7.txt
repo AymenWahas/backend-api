@@ -1,0 +1,74 @@
+1
+Repository Integration Tests
+|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+ayman-wahas@ayman-wahas:~/backend-api$ go test ./internal/repository/postgres -v
+=== RUN   TestEmployeeRepositoryDuplicateEmail
+
+2026/09/07 22:47:51 /home/ayman-wahas/backend-api/internal/repository/postgres/employee_repository.go:40 ERROR:duplicate key value violates unique constraint "uni_employees_email" (SQLSTATE 23505)
+[2.632ms] [rows:0] INSERT INTO "employees" ("name","email","department","created_at","updated_at","deleted_at")VALUES ('Duplicate Test 2','duplicate-test@example.com',NULL,'2026-09-07 22:47:51.832','2026-09-07 22:47:51.832',NULL) RETURNING "id"
+--- PASS: TestEmployeeRepositoryDuplicateEmail (0.05s)
+=== RUN   TestPostgreSQLContextTimeout
+
+2026/09/07 22:47:51 /home/ayman-wahas/backend-api/internal/repository/postgres/employee_repository_timeout_test.go:42 timeout: context deadline exceeded
+[101.131ms] [rows:-] SELECT 1 FROM pg_sleep(2)
+--- PASS: TestPostgreSQLContextTimeout (0.12s)
+=== RUN   TestProjectOptimisticConcurrency
+    project_repository_optimistic_test.go:86: TX1 version: 1
+    project_repository_optimistic_test.go:87: TX2 version: 1
+    project_repository_optimistic_test.go:105: TX1 update succeeded: version 1 → 2
+    project_repository_optimistic_test.go:123: TX2 update rejected: stale version detected
+    project_repository_optimistic_test.go:131: Final project: name="Project A" version=2
+    project_repository_optimistic_test.go:152: optimistic concurrency verified: lost update prevented
+--- PASS: TestProjectOptimisticConcurrency (0.11s)
+PASS
+ok      backend-api/internal/repository/postgres        0.301s
+******************************************
+
+*****************************
+
+Timeout Handling
+----------------
+ayman-wahas@ayman-wahas:~/backend-api$ go test ./internal/repository/postgres -run TestPostgreSQLContextTimeout -v
+=== RUN   TestPostgreSQLContextTimeout
+
+2026/09/07 17:48:33 /home/ayman-wahas/backend-api/internal/repository/postgres/employee_repository_timeout_test.go:42 timeout: context deadline exceeded
+[101.404ms] [rows:-] SELECT 1 FROM pg_sleep(2)
+--- PASS: TestPostgreSQLContextTimeout (0.12s)
+PASS
+ok      backend-api/internal/repository/postgres        0.131s
+
+|||||||||||||||||||\\\\\\\\\\\\\\\\\\\\\
+3 Transaction Rollback
+\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+ayman-wahas@ayman-wahas:~/backend-api$ go test ./internal/usecase -run TestPostgresCreateProjectWithTaskRollback -v
+=== RUN   TestPostgresCreateProjectWithTaskRollback
+
+2026/09/07 22:45:21 /home/ayman-wahas/backend-api/internal/repository/postgres/task_repository.go:24 ERROR: duplicate key value violates unique constraint "tasks_pkey" (SQLSTATE 23505)
+[3.325ms] [rows:0] INSERT INTO "tasks" ("project_id","title","status","created_at","updated_at","deleted_at","id") VALUES (16,'Duplicate Task','pending','2026-09-07 22:45:21.21','2026-09-07 22:45:21.21',NULL,1) RETURNING "id"
+    project_task_postgres_test.go:92: transaction failed as expected: ERROR: duplicate key value violates unique constraint "tasks_pkey" (SQLSTATE 23505)
+    project_task_postgres_test.go:114: rollback verified: project was not committed
+--- PASS: TestPostgresCreateProjectWithTaskRollback (0.19s)
+PASS
+ok      backend-api/internal/usecase    (cached)
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@
+Clean Error Mapping
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+ayman-wahas@ayman-wahas:~/backend-api$ go test ./internal/repository/postgres -run TestEmployeeRepositoryDuplicateEmail -v
+=== RUN   TestEmployeeRepositoryDuplicateEmail
+
+2026/09/07 22:51:25 /home/ayman-wahas/backend-api/internal/repository/postgres/employee_repository.go:40 ERROR:duplicate key value violates unique constraint "uni_employees_email" (SQLSTATE 23505)
+[3.590ms] [rows:0] INSERT INTO "employees" ("name","email","department","created_at","updated_at","deleted_at")VALUES ('Duplicate Test 2','duplicate-test@example.com',NULL,'2026-09-07 22:51:25.163','2026-09-07 22:51:25.163',NULL) RETURNING "id"
+--- PASS: TestEmployeeRepositoryDuplicateEmail (0.05s)
+PASS
+ok      backend-api/internal/repository/postgres        0.067s
+
+
+
+#######################3
+Row Lock / FOR UPDATE
+###########################33
+ayman-wahas@ayman-wahas:~/backend-api$ go test ./internal/database -run TestRowLock -v
+testing: warning: no tests to run
+PASS
+ok      backend-api/internal/database   0.014s [no tests to run]

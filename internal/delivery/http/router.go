@@ -10,7 +10,7 @@ import (
 	"backend-api/internal/delivery/http/middleware"
 )
 
-func NewRouter(h *handler.Handler) http.Handler {
+func NewRouter(h *handler.Handler, requestTimeout time.Duration) http.Handler {
 	// API routes
 	apiMux := http.NewServeMux()
 	apiMux.HandleFunc("GET /health", h.Health)
@@ -91,7 +91,7 @@ func NewRouter(h *handler.Handler) http.Handler {
 	return middleware.RequestID(
 		middleware.Recovery(
 			middleware.RequestLogger(
-				middleware.Timeout(5 * time.Second)(mux),
+				middleware.Timeout(requestTimeout)(mux),
 			),
 		),
 	)

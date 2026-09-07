@@ -32,6 +32,7 @@ func NewHandler(
 		taskHandler:    NewTaskHandler(taskUC),
 	}
 }
+
 func (h *Handler) Health(w http.ResponseWriter, r *http.Request) {
 	response.WriteJSON(w, http.StatusOK, map[string]string{
 		"status": "ok",
@@ -60,13 +61,15 @@ func (h *Handler) CreateEmployee(w http.ResponseWriter, r *http.Request) {
 		)
 		return
 	}
-	//dto to domain
+
+	// dto to domain
 	employee := domain.Employee{
 		Name:       req.Name,
 		Email:      req.Email,
 		Department: req.Department,
 	}
-	//call usecase to create employee
+
+	// call usecase to create employee
 	created, err := h.usecase.CreateEmployee(r.Context(), employee)
 	if err != nil {
 		if errors.Is(err, usecase.ErrInvalidEmployee) {
@@ -79,30 +82,45 @@ func (h *Handler) CreateEmployee(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		response.WriteError(w, http.StatusInternalServerError,
+		if errors.Is(err, domain.ErrEmployeeAlreadyExists) {
+			response.WriteError(
+				w,
+				http.StatusConflict,
+				"EMPLOYEE_ALREADY_EXISTS",
+				"employee with this email already exists",
+			)
+			return
+		}
+
+		response.WriteError(
+			w,
+			http.StatusInternalServerError,
 			"INTERNAL_ERROR",
 			"internal server error",
 		)
 		return
 	}
+
 	// domain to dto
 	res := dto.EmployeeResponse{
 		ID:         created.ID,
 		Name:       created.Name,
 		Email:      created.Email,
-		Department: req.Department,
+		Department: created.Department,
 	}
-	//send response error if any other error occurs
+
 	response.WriteJSON(w, http.StatusCreated, res)
 }
 
 func (h *Handler) GetEmployees(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
+
 	filter := repository.EmployeeFilter{
 		Name:  query.Get("name"),
 		Email: query.Get("email"),
 	}
-	//sort by id, name, email
+
+	// sort by id, name, email
 	sortParam := query.Get("sort")
 
 	sortBy := repository.EmployeeSort{
@@ -115,10 +133,10 @@ func (h *Handler) GetEmployees(w http.ResponseWriter, r *http.Request) {
 	} else if sortParam != "" {
 		sortBy.Field = sortParam
 	}
+
 	if sortBy.Field != "id" &&
 		sortBy.Field != "name" &&
 		sortBy.Field != "email" {
-
 		response.WriteError(
 			w,
 			http.StatusBadRequest,
@@ -127,7 +145,8 @@ func (h *Handler) GetEmployees(w http.ResponseWriter, r *http.Request) {
 		)
 		return
 	}
-	//pagination
+
+	// pagination
 	page := 1
 	pageSize := 10
 
@@ -163,8 +182,7 @@ func (h *Handler) GetEmployees(w http.ResponseWriter, r *http.Request) {
 
 	offset := (page - 1) * pageSize
 
-	//call usecase to get employees with filter, sort and pagination
-
+	// call usecase to get employees with filter, sort and pagination
 	employees, total, version, err := h.usecase.GetEmployees(
 		r.Context(),
 		filter,
@@ -181,7 +199,8 @@ func (h *Handler) GetEmployees(w http.ResponseWriter, r *http.Request) {
 		)
 		return
 	}
-	//set etag header for caching
+
+	// set etag header for caching
 	etag := fmt.Sprintf(
 		`"employees-%d-page-%d-size-%d-name-%s-email-%s-sort-%s-desc-%t"`,
 		version,
@@ -192,13 +211,16 @@ func (h *Handler) GetEmployees(w http.ResponseWriter, r *http.Request) {
 		sortBy.Field,
 		sortBy.Desc,
 	)
+
 	w.Header().Set("ETag", etag)
-	//check if the etag matches the request header, if so return 304 Not Modified
+
+	// check if the etag matches the request header
 	if r.Header.Get("If-None-Match") == etag {
 		w.WriteHeader(http.StatusNotModified)
 		return
 	}
-	//convert domain employees to dto employees
+
+	// convert domain employees to dto employees
 	data := make([]dto.EmployeeResponse, 0, len(employees))
 
 	for _, employee := range employees {
@@ -209,12 +231,15 @@ func (h *Handler) GetEmployees(w http.ResponseWriter, r *http.Request) {
 			Department: employee.Department,
 		})
 	}
-	//calculate total pages for pagination
+
+	// calculate total pages for pagination
 	totalPages := 0
+
 	if total > 0 {
 		totalPages = (total + pageSize - 1) / pageSize
 	}
-	//create response with data and pagination info
+
+	// create response with data and pagination info
 	res := dto.EmployeeListResponse{
 		Data: data,
 		Pagination: dto.Pagination{
@@ -231,6 +256,7 @@ func (h *Handler) GetEmployees(w http.ResponseWriter, r *http.Request) {
 // GetEmployee handles the GET /employees/{id} endpoint.
 func (h *Handler) GetEmployee(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.Atoi(r.PathValue("id"))
+
 	if err != nil || id <= 0 {
 		response.WriteError(
 			w,
@@ -240,6 +266,7 @@ func (h *Handler) GetEmployee(w http.ResponseWriter, r *http.Request) {
 		)
 		return
 	}
+
 	employee, err := h.usecase.GetEmployee(r.Context(), id)
 	if err != nil {
 		if errors.Is(err, repository.ErrEmployeeNotFound) {
@@ -266,6 +293,7 @@ func (h *Handler) GetEmployee(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) UpdateEmployee(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.Atoi(r.PathValue("id"))
+
 	if err != nil || id <= 0 {
 		response.WriteError(
 			w,
@@ -314,6 +342,14 @@ func (h *Handler) UpdateEmployee(w http.ResponseWriter, r *http.Request) {
 				"employee not found",
 			)
 
+		case errors.Is(err, domain.ErrEmployeeAlreadyExists):
+			response.WriteError(
+				w,
+				http.StatusConflict,
+				"EMPLOYEE_ALREADY_EXISTS",
+				"employee with this email already exists",
+			)
+
 		default:
 			response.WriteError(
 				w,
@@ -338,6 +374,7 @@ func (h *Handler) UpdateEmployee(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) DeleteEmployee(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.Atoi(r.PathValue("id"))
+
 	if err != nil || id <= 0 {
 		response.WriteError(
 			w,
@@ -371,6 +408,7 @@ func (h *Handler) DeleteEmployee(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusNoContent)
 }
+
 func (h *Handler) CreateProject(w http.ResponseWriter, r *http.Request) {
 	h.projectHandler.Create(w, r)
 }
@@ -394,15 +432,19 @@ func (h *Handler) DeleteProject(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) CreateTask(w http.ResponseWriter, r *http.Request) {
 	h.taskHandler.Create(w, r)
 }
+
 func (h *Handler) GetTasks(w http.ResponseWriter, r *http.Request) {
 	h.taskHandler.GetAll(w, r)
 }
+
 func (h *Handler) GetTask(w http.ResponseWriter, r *http.Request) {
 	h.taskHandler.GetByID(w, r)
 }
+
 func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request) {
 	h.taskHandler.Update(w, r)
 }
+
 func (h *Handler) DeleteTask(w http.ResponseWriter, r *http.Request) {
 	h.taskHandler.Delete(w, r)
 }

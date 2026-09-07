@@ -6,6 +6,7 @@ import (
 
 	"gorm.io/gorm"
 
+	"backend-api/internal/database"
 	"backend-api/internal/domain"
 )
 
@@ -20,13 +21,13 @@ func NewTaskRepository(db *gorm.DB) *TaskRepository {
 }
 
 func (r *TaskRepository) Create(ctx context.Context, task *domain.Task) error {
-	return r.db.WithContext(ctx).Create(task).Error
+	return database.DBFromContext(ctx, r.db).WithContext(ctx).Create(task).Error
 }
 
 func (r *TaskRepository) GetByID(ctx context.Context, id uint) (*domain.Task, error) {
 	var task domain.Task
 
-	err := r.db.WithContext(ctx).
+	err := database.DBFromContext(ctx, r.db).WithContext(ctx).
 		Preload("Project").
 		First(&task, id).Error
 
@@ -44,7 +45,7 @@ func (r *TaskRepository) GetByID(ctx context.Context, id uint) (*domain.Task, er
 func (r *TaskRepository) GetAll(ctx context.Context) ([]domain.Task, error) {
 	var tasks []domain.Task
 
-	err := r.db.WithContext(ctx).
+	err := database.DBFromContext(ctx, r.db).WithContext(ctx).
 		Preload("Project").
 		Find(&tasks).Error
 
@@ -56,7 +57,7 @@ func (r *TaskRepository) GetAll(ctx context.Context) ([]domain.Task, error) {
 }
 
 func (r *TaskRepository) Update(ctx context.Context, task *domain.Task) error {
-	result := r.db.WithContext(ctx).
+	result := database.DBFromContext(ctx, r.db).WithContext(ctx).
 		Model(&domain.Task{}).
 		Where("id = ?", task.ID).
 		Updates(task)
@@ -73,7 +74,7 @@ func (r *TaskRepository) Update(ctx context.Context, task *domain.Task) error {
 }
 
 func (r *TaskRepository) Delete(ctx context.Context, id uint) error {
-	result := r.db.WithContext(ctx).
+	result := database.DBFromContext(ctx, r.db).WithContext(ctx).
 		Delete(&domain.Task{}, id)
 
 	if result.Error != nil {
