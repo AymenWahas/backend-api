@@ -1,0 +1,133 @@
+```text
+DAY 9 — MESSAGING, WORKERS, RETRIES, DLQ, IDEMPOTENCY
+
+Project: backend-api
+Date: 2026-09-09
+====================================
+1. BROKER
+=========================
+
+Broker: Redis Streams
+Stream: task-events
+Consumer Group: notifications
+Consumer: notification-worker-1
+DLQ: task-events:dlq
+Max Attempts: 3
+Recovery: XAUTOCLAIM
+ACK: XACK
+
+***************************
+2. IDEMPOTENCY TEST
+************
+
+go test ./internal/worker -v
+
+Result:
+
+--- PASS: TestNotificationWorkerIntegration (0.12s)
+PASS
+ok      backend-api/internal/worker     0.108s
+
+Evidence:
+
+PostgreSQL rejected duplicate event_id with:
+
+ERROR: duplicate key value violates unique constraint
+"notifications_event_id_key" (SQLSTATE 23505)
+
+Worker:
+
+duplicate notification skipped
+
+Final:
+
+idempotency verified: duplicate event did not create another notification
+
+RESULT: IDEMPOTENCY VERIFIED
+)))))))))))))))))))))))))))
+3. RETRY + DLQ TEST
+((((((((((((((((((((99))))))))))))))))))))
+
+Result:
+
+Attempt 1:
+message remains pending
+
+Attempt 2:
+message reclaimed using XAUTOCLAIM
+
+Attempt 3:
+message reclaimed again
+
+After 3 attempts:
+
+message moved to DLQ
+dlq_stream=task-events:dlq
+
+Then:
+
+ACK verified
+retry counter cleanup verified
+
+Final:
+
+--- PASS: TestNotificationWorkerRetryAndDLQ (0.33s)
+PASS
+ok      backend-api/internal/worker     0.460s
+
+RESULT: RETRY + DLQ VERIFIED
+
+============================================================
+4. FULL TESTS
+============================================================
+
+Command:
+
+go test ./...
+
+Result:
+
+ok      backend-api/internal/database
+ok      backend-api/internal/delivery/http/dto
+ok      backend-api/internal/delivery/http/handler
+ok      backend-api/internal/delivery/http/middleware
+ok      backend-api/internal/repository/postgres
+ok      backend-api/internal/usecase
+ok      backend-api/internal/worker     0.525s
+
+RESULT: FULL PROJECT TEST PASSED
+&&&&&&&&&&&&&&&&&&&&7
+5. GO VET
+&&&&&&&&&&&&&&&&&&&&&7&&&&&&&
+
+Command:
+
+go vet ./...
+
+Result:
+
+No output.
+
+RESULT: GO VET PASSED
+
+++++++++++++++
+DAY 9 FINAL RESULT
+++++++++++++++++++=
+
+Redis Streams              PASS
+Consumer Group             PASS
+Producer / Consumer        PASS
+ACK                         PASS
+Pending Messages            PASS
+At-least-once behavior      PASS
+Retry                       PASS
+XAUTOCLAIM                  PASS
+DLQ                         PASS
+Idempotency                 PASS
+PostgreSQL persistence      PASS
+Integration Tests           PASS
+Full Tests                  PASS
+go vet                      PASS
+
+DAY 9 STATUS: COMPLETED
+```

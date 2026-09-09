@@ -59,8 +59,8 @@ func (r *ProjectPostgresRepo) Update(ctx context.Context, project *domain.Projec
 		Updates(map[string]interface{}{
 			"name":        project.Name,
 			"description": project.Description,
-			"owner_id":    project.OwnerID,
-			"version":     oldVersion + 1,
+
+			"version": oldVersion + 1,
 		})
 
 	if result.Error != nil {

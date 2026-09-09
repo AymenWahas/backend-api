@@ -66,8 +66,8 @@ func (f *fakeEmployeeRepository) Delete(
 func TestCreateEmployee(t *testing.T) {
 	repo := &fakeEmployeeRepository{}
 	employeeUC := usecase.NewEmployeeUsecase(repo)
-	projectUC := usecase.NewProjectUsecase(nil)
-	taskUC := usecase.NewTaskUsecase(nil)
+	projectUC := usecase.NewProjectUsecase(nil, nil)
+	taskUC := usecase.NewTaskUsecase(nil, nil)
 
 	h := NewHandler(employeeUC, projectUC, taskUC)
 	body := `{

@@ -2,8 +2,8 @@
   "openapi": "3.0.3",
   "info": {
     "title": "Employee API",
-    "description": "REST API for managing employees, projects, and tasks",
-    "version": "1.0.0"
+    "description": "REST API for managing employees, projects, and tasks. The API uses HTTPS and JSON responses with consistent error handling. Task creation may trigger asynchronous notification processing through a background worker.",
+    "version": "1.1.0"
   },
   "servers": [
     {
@@ -32,6 +32,7 @@
   "paths": {
     "/health": {
       "get": {
+        "operationId": "healthCheck",
         "tags": [
           "Health"
         ],
@@ -51,8 +52,10 @@
         }
       }
     },
+
     "/api/v1/employees": {
       "get": {
+        "operationId": "listEmployees",
         "tags": [
           "Employees"
         ],
@@ -63,7 +66,7 @@
             "name": "page",
             "in": "query",
             "required": false,
-            "description": "Page number",
+            "description": "Page number.",
             "schema": {
               "type": "integer",
               "minimum": 1,
@@ -74,7 +77,7 @@
             "name": "page_size",
             "in": "query",
             "required": false,
-            "description": "Number of employees per page",
+            "description": "Number of employees per page.",
             "schema": {
               "type": "integer",
               "minimum": 1,
@@ -86,7 +89,7 @@
             "name": "name",
             "in": "query",
             "required": false,
-            "description": "Filter employees by name",
+            "description": "Filter employees by name.",
             "schema": {
               "type": "string"
             }
@@ -95,7 +98,7 @@
             "name": "email",
             "in": "query",
             "required": false,
-            "description": "Filter employees by email",
+            "description": "Filter employees by email.",
             "schema": {
               "type": "string"
             }
@@ -104,7 +107,7 @@
             "name": "sort",
             "in": "query",
             "required": false,
-            "description": "Sort field. Prefix with '-' for descending order (e.g., '-name')",
+            "description": "Sort field. Prefix with '-' for descending order.",
             "schema": {
               "type": "string",
               "enum": [
@@ -122,7 +125,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Employees retrieved successfully",
+            "description": "Employees retrieved successfully.",
             "content": {
               "application/json": {
                 "schema": {
@@ -132,7 +135,7 @@
             }
           },
           "400": {
-            "description": "Invalid parameters",
+            "description": "Invalid parameters.",
             "content": {
               "application/json": {
                 "schema": {
@@ -142,7 +145,7 @@
             }
           },
           "406": {
-            "description": "Not acceptable",
+            "description": "Not acceptable.",
             "content": {
               "application/json": {
                 "schema": {
@@ -152,7 +155,7 @@
             }
           },
           "500": {
-            "description": "Internal server error",
+            "description": "Internal server error.",
             "content": {
               "application/json": {
                 "schema": {
@@ -163,7 +166,9 @@
           }
         }
       },
+
       "post": {
+        "operationId": "createEmployee",
         "tags": [
           "Employees"
         ],
@@ -181,7 +186,7 @@
         },
         "responses": {
           "201": {
-            "description": "Employee created successfully",
+            "description": "Employee created successfully.",
             "content": {
               "application/json": {
                 "schema": {
@@ -191,7 +196,7 @@
             }
           },
           "400": {
-            "description": "Invalid employee data",
+            "description": "Invalid employee data.",
             "content": {
               "application/json": {
                 "schema": {
@@ -201,7 +206,7 @@
             }
           },
           "406": {
-            "description": "Not acceptable",
+            "description": "Not acceptable.",
             "content": {
               "application/json": {
                 "schema": {
@@ -211,7 +216,7 @@
             }
           },
           "415": {
-            "description": "Unsupported media type",
+            "description": "Unsupported media type.",
             "content": {
               "application/json": {
                 "schema": {
@@ -221,7 +226,7 @@
             }
           },
           "500": {
-            "description": "Internal server error",
+            "description": "Internal server error.",
             "content": {
               "application/json": {
                 "schema": {
@@ -233,8 +238,10 @@
         }
       }
     },
+
     "/api/v1/employees/{id}": {
       "get": {
+        "operationId": "getEmployee",
         "tags": [
           "Employees"
         ],
@@ -245,7 +252,7 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "description": "Employee ID",
+            "description": "Employee ID.",
             "schema": {
               "type": "integer",
               "minimum": 1
@@ -254,7 +261,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Employee retrieved successfully",
+            "description": "Employee retrieved successfully.",
             "content": {
               "application/json": {
                 "schema": {
@@ -264,7 +271,7 @@
             }
           },
           "400": {
-            "description": "Invalid employee ID",
+            "description": "Invalid employee ID.",
             "content": {
               "application/json": {
                 "schema": {
@@ -274,7 +281,7 @@
             }
           },
           "404": {
-            "description": "Employee not found",
+            "description": "Employee not found.",
             "content": {
               "application/json": {
                 "schema": {
@@ -284,7 +291,7 @@
             }
           },
           "406": {
-            "description": "Not acceptable",
+            "description": "Not acceptable.",
             "content": {
               "application/json": {
                 "schema": {
@@ -294,7 +301,7 @@
             }
           },
           "500": {
-            "description": "Internal server error",
+            "description": "Internal server error.",
             "content": {
               "application/json": {
                 "schema": {
@@ -305,7 +312,9 @@
           }
         }
       },
+
       "put": {
+        "operationId": "updateEmployee",
         "tags": [
           "Employees"
         ],
@@ -316,7 +325,7 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "description": "Employee ID",
+            "description": "Employee ID.",
             "schema": {
               "type": "integer",
               "minimum": 1
@@ -335,7 +344,7 @@
         },
         "responses": {
           "200": {
-            "description": "Employee updated successfully",
+            "description": "Employee updated successfully.",
             "content": {
               "application/json": {
                 "schema": {
@@ -345,7 +354,7 @@
             }
           },
           "400": {
-            "description": "Invalid employee data",
+            "description": "Invalid employee data.",
             "content": {
               "application/json": {
                 "schema": {
@@ -355,7 +364,7 @@
             }
           },
           "404": {
-            "description": "Employee not found",
+            "description": "Employee not found.",
             "content": {
               "application/json": {
                 "schema": {
@@ -365,7 +374,7 @@
             }
           },
           "406": {
-            "description": "Not acceptable",
+            "description": "Not acceptable.",
             "content": {
               "application/json": {
                 "schema": {
@@ -375,7 +384,7 @@
             }
           },
           "415": {
-            "description": "Unsupported media type",
+            "description": "Unsupported media type.",
             "content": {
               "application/json": {
                 "schema": {
@@ -385,7 +394,7 @@
             }
           },
           "500": {
-            "description": "Internal server error",
+            "description": "Internal server error.",
             "content": {
               "application/json": {
                 "schema": {
@@ -396,7 +405,9 @@
           }
         }
       },
+
       "delete": {
+        "operationId": "deleteEmployee",
         "tags": [
           "Employees"
         ],
@@ -407,7 +418,7 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "description": "Employee ID",
+            "description": "Employee ID.",
             "schema": {
               "type": "integer",
               "minimum": 1
@@ -416,10 +427,10 @@
         ],
         "responses": {
           "204": {
-            "description": "Employee deleted successfully"
+            "description": "Employee deleted successfully."
           },
           "400": {
-            "description": "Invalid employee ID",
+            "description": "Invalid employee ID.",
             "content": {
               "application/json": {
                 "schema": {
@@ -429,7 +440,7 @@
             }
           },
           "404": {
-            "description": "Employee not found",
+            "description": "Employee not found.",
             "content": {
               "application/json": {
                 "schema": {
@@ -439,7 +450,7 @@
             }
           },
           "406": {
-            "description": "Not acceptable",
+            "description": "Not acceptable.",
             "content": {
               "application/json": {
                 "schema": {
@@ -449,7 +460,7 @@
             }
           },
           "500": {
-            "description": "Internal server error",
+            "description": "Internal server error.",
             "content": {
               "application/json": {
                 "schema": {
@@ -461,8 +472,10 @@
         }
       }
     },
+
     "/api/v1/projects": {
       "get": {
+        "operationId": "listProjects",
         "tags": [
           "Projects"
         ],
@@ -470,7 +483,7 @@
         "description": "Get a list of all projects.",
         "responses": {
           "200": {
-            "description": "Projects retrieved successfully",
+            "description": "Projects retrieved successfully.",
             "content": {
               "application/json": {
                 "schema": {
@@ -483,7 +496,7 @@
             }
           },
           "406": {
-            "description": "Not acceptable",
+            "description": "Not acceptable.",
             "content": {
               "application/json": {
                 "schema": {
@@ -493,7 +506,7 @@
             }
           },
           "500": {
-            "description": "Internal server error",
+            "description": "Internal server error.",
             "content": {
               "application/json": {
                 "schema": {
@@ -504,7 +517,9 @@
           }
         }
       },
+
       "post": {
+        "operationId": "createProject",
         "tags": [
           "Projects"
         ],
@@ -522,7 +537,7 @@
         },
         "responses": {
           "201": {
-            "description": "Project created successfully",
+            "description": "Project created successfully.",
             "content": {
               "application/json": {
                 "schema": {
@@ -532,7 +547,7 @@
             }
           },
           "400": {
-            "description": "Invalid project data",
+            "description": "Invalid project data.",
             "content": {
               "application/json": {
                 "schema": {
@@ -542,7 +557,7 @@
             }
           },
           "406": {
-            "description": "Not acceptable",
+            "description": "Not acceptable.",
             "content": {
               "application/json": {
                 "schema": {
@@ -552,7 +567,7 @@
             }
           },
           "415": {
-            "description": "Unsupported media type",
+            "description": "Unsupported media type.",
             "content": {
               "application/json": {
                 "schema": {
@@ -562,7 +577,7 @@
             }
           },
           "500": {
-            "description": "Internal server error",
+            "description": "Internal server error.",
             "content": {
               "application/json": {
                 "schema": {
@@ -574,8 +589,10 @@
         }
       }
     },
+
     "/api/v1/projects/{id}": {
       "get": {
+        "operationId": "getProject",
         "tags": [
           "Projects"
         ],
@@ -586,7 +603,7 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "description": "Project ID",
+            "description": "Project ID.",
             "schema": {
               "type": "integer",
               "minimum": 1
@@ -595,7 +612,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Project retrieved successfully",
+            "description": "Project retrieved successfully.",
             "content": {
               "application/json": {
                 "schema": {
@@ -605,7 +622,7 @@
             }
           },
           "400": {
-            "description": "Invalid project ID",
+            "description": "Invalid project ID.",
             "content": {
               "application/json": {
                 "schema": {
@@ -615,7 +632,7 @@
             }
           },
           "404": {
-            "description": "Project not found",
+            "description": "Project not found.",
             "content": {
               "application/json": {
                 "schema": {
@@ -625,7 +642,7 @@
             }
           },
           "406": {
-            "description": "Not acceptable",
+            "description": "Not acceptable.",
             "content": {
               "application/json": {
                 "schema": {
@@ -635,7 +652,7 @@
             }
           },
           "500": {
-            "description": "Internal server error",
+            "description": "Internal server error.",
             "content": {
               "application/json": {
                 "schema": {
@@ -646,7 +663,9 @@
           }
         }
       },
+
       "put": {
+        "operationId": "updateProject",
         "tags": [
           "Projects"
         ],
@@ -657,7 +676,7 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "description": "Project ID",
+            "description": "Project ID.",
             "schema": {
               "type": "integer",
               "minimum": 1
@@ -676,7 +695,7 @@
         },
         "responses": {
           "200": {
-            "description": "Project updated successfully",
+            "description": "Project updated successfully.",
             "content": {
               "application/json": {
                 "schema": {
@@ -686,7 +705,7 @@
             }
           },
           "400": {
-            "description": "Invalid project data",
+            "description": "Invalid project data.",
             "content": {
               "application/json": {
                 "schema": {
@@ -696,7 +715,7 @@
             }
           },
           "404": {
-            "description": "Project not found",
+            "description": "Project not found.",
             "content": {
               "application/json": {
                 "schema": {
@@ -706,7 +725,7 @@
             }
           },
           "406": {
-            "description": "Not acceptable",
+            "description": "Not acceptable.",
             "content": {
               "application/json": {
                 "schema": {
@@ -716,7 +735,7 @@
             }
           },
           "415": {
-            "description": "Unsupported media type",
+            "description": "Unsupported media type.",
             "content": {
               "application/json": {
                 "schema": {
@@ -726,7 +745,7 @@
             }
           },
           "500": {
-            "description": "Internal server error",
+            "description": "Internal server error.",
             "content": {
               "application/json": {
                 "schema": {
@@ -737,7 +756,9 @@
           }
         }
       },
+
       "delete": {
+        "operationId": "deleteProject",
         "tags": [
           "Projects"
         ],
@@ -748,7 +769,7 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "description": "Project ID",
+            "description": "Project ID.",
             "schema": {
               "type": "integer",
               "minimum": 1
@@ -757,10 +778,10 @@
         ],
         "responses": {
           "204": {
-            "description": "Project deleted successfully"
+            "description": "Project deleted successfully."
           },
           "400": {
-            "description": "Invalid project ID",
+            "description": "Invalid project ID.",
             "content": {
               "application/json": {
                 "schema": {
@@ -770,7 +791,7 @@
             }
           },
           "404": {
-            "description": "Project not found",
+            "description": "Project not found.",
             "content": {
               "application/json": {
                 "schema": {
@@ -780,7 +801,7 @@
             }
           },
           "406": {
-            "description": "Not acceptable",
+            "description": "Not acceptable.",
             "content": {
               "application/json": {
                 "schema": {
@@ -790,7 +811,7 @@
             }
           },
           "500": {
-            "description": "Internal server error",
+            "description": "Internal server error.",
             "content": {
               "application/json": {
                 "schema": {
@@ -802,8 +823,10 @@
         }
       }
     },
+
     "/api/v1/tasks": {
       "get": {
+        "operationId": "listTasks",
         "tags": [
           "Tasks"
         ],
@@ -811,7 +834,7 @@
         "description": "Get a list of all tasks.",
         "responses": {
           "200": {
-            "description": "Tasks retrieved successfully",
+            "description": "Tasks retrieved successfully.",
             "content": {
               "application/json": {
                 "schema": {
@@ -824,7 +847,7 @@
             }
           },
           "406": {
-            "description": "Not acceptable",
+            "description": "Not acceptable.",
             "content": {
               "application/json": {
                 "schema": {
@@ -834,7 +857,7 @@
             }
           },
           "500": {
-            "description": "Internal server error",
+            "description": "Internal server error.",
             "content": {
               "application/json": {
                 "schema": {
@@ -845,12 +868,14 @@
           }
         }
       },
+
       "post": {
+        "operationId": "createTask",
         "tags": [
           "Tasks"
         ],
         "summary": "Create task",
-        "description": "Create a new task.",
+        "description": "Create a new task. After successful creation, a task.created event may be published for asynchronous notification processing by a background worker.",
         "requestBody": {
           "required": true,
           "content": {
@@ -863,7 +888,7 @@
         },
         "responses": {
           "201": {
-            "description": "Task created successfully",
+            "description": "Task created successfully.",
             "content": {
               "application/json": {
                 "schema": {
@@ -873,7 +898,7 @@
             }
           },
           "400": {
-            "description": "Invalid task data",
+            "description": "Invalid task data.",
             "content": {
               "application/json": {
                 "schema": {
@@ -883,7 +908,7 @@
             }
           },
           "406": {
-            "description": "Not acceptable",
+            "description": "Not acceptable.",
             "content": {
               "application/json": {
                 "schema": {
@@ -893,7 +918,7 @@
             }
           },
           "415": {
-            "description": "Unsupported media type",
+            "description": "Unsupported media type.",
             "content": {
               "application/json": {
                 "schema": {
@@ -903,7 +928,7 @@
             }
           },
           "500": {
-            "description": "Internal server error",
+            "description": "Internal server error.",
             "content": {
               "application/json": {
                 "schema": {
@@ -915,8 +940,10 @@
         }
       }
     },
+
     "/api/v1/tasks/{id}": {
       "get": {
+        "operationId": "getTask",
         "tags": [
           "Tasks"
         ],
@@ -927,7 +954,7 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "description": "Task ID",
+            "description": "Task ID.",
             "schema": {
               "type": "integer",
               "minimum": 1
@@ -936,7 +963,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Task retrieved successfully",
+            "description": "Task retrieved successfully.",
             "content": {
               "application/json": {
                 "schema": {
@@ -946,7 +973,7 @@
             }
           },
           "400": {
-            "description": "Invalid task ID",
+            "description": "Invalid task ID.",
             "content": {
               "application/json": {
                 "schema": {
@@ -956,7 +983,7 @@
             }
           },
           "404": {
-            "description": "Task not found",
+            "description": "Task not found.",
             "content": {
               "application/json": {
                 "schema": {
@@ -966,7 +993,7 @@
             }
           },
           "406": {
-            "description": "Not acceptable",
+            "description": "Not acceptable.",
             "content": {
               "application/json": {
                 "schema": {
@@ -976,7 +1003,7 @@
             }
           },
           "500": {
-            "description": "Internal server error",
+            "description": "Internal server error.",
             "content": {
               "application/json": {
                 "schema": {
@@ -987,7 +1014,9 @@
           }
         }
       },
+
       "put": {
+        "operationId": "updateTask",
         "tags": [
           "Tasks"
         ],
@@ -998,7 +1027,7 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "description": "Task ID",
+            "description": "Task ID.",
             "schema": {
               "type": "integer",
               "minimum": 1
@@ -1017,7 +1046,7 @@
         },
         "responses": {
           "200": {
-            "description": "Task updated successfully",
+            "description": "Task updated successfully.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1027,7 +1056,7 @@
             }
           },
           "400": {
-            "description": "Invalid task data",
+            "description": "Invalid task data.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1037,7 +1066,7 @@
             }
           },
           "404": {
-            "description": "Task not found",
+            "description": "Task not found.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1047,7 +1076,7 @@
             }
           },
           "406": {
-            "description": "Not acceptable",
+            "description": "Not acceptable.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1057,7 +1086,7 @@
             }
           },
           "415": {
-            "description": "Unsupported media type",
+            "description": "Unsupported media type.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1067,7 +1096,7 @@
             }
           },
           "500": {
-            "description": "Internal server error",
+            "description": "Internal server error.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1078,7 +1107,9 @@
           }
         }
       },
+
       "delete": {
+        "operationId": "deleteTask",
         "tags": [
           "Tasks"
         ],
@@ -1089,7 +1120,7 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "description": "Task ID",
+            "description": "Task ID.",
             "schema": {
               "type": "integer",
               "minimum": 1
@@ -1098,10 +1129,10 @@
         ],
         "responses": {
           "204": {
-            "description": "Task deleted successfully"
+            "description": "Task deleted successfully."
           },
           "400": {
-            "description": "Invalid task ID",
+            "description": "Invalid task ID.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1111,7 +1142,7 @@
             }
           },
           "404": {
-            "description": "Task not found",
+            "description": "Task not found.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1121,7 +1152,7 @@
             }
           },
           "406": {
-            "description": "Not acceptable",
+            "description": "Not acceptable.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1131,7 +1162,7 @@
             }
           },
           "500": {
-            "description": "Internal server error",
+            "description": "Internal server error.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1144,6 +1175,7 @@
       }
     }
   },
+
   "components": {
     "schemas": {
       "CreateEmployeeRequest": {
@@ -1168,6 +1200,7 @@
           }
         }
       },
+
       "UpdateEmployeeRequest": {
         "type": "object",
         "required": [
@@ -1190,6 +1223,7 @@
           }
         }
       },
+
       "EmployeeResponse": {
         "type": "object",
         "properties": {
@@ -1212,29 +1246,40 @@
           }
         }
       },
+
       "Pagination": {
         "type": "object",
         "properties": {
           "page": {
             "type": "integer",
+            "minimum": 1,
             "example": 1
           },
           "page_size": {
             "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
             "example": 10
           },
           "total": {
             "type": "integer",
+            "minimum": 0,
             "example": 3
           },
           "total_pages": {
             "type": "integer",
+            "minimum": 0,
             "example": 1
           }
         }
       },
+
       "EmployeeListResponse": {
         "type": "object",
+        "required": [
+          "data",
+          "pagination"
+        ],
         "properties": {
           "data": {
             "type": "array",
@@ -1247,6 +1292,7 @@
           }
         }
       },
+
       "CreateProjectRequest": {
         "type": "object",
         "required": [
@@ -1263,6 +1309,7 @@
           }
         }
       },
+
       "UpdateProjectRequest": {
         "type": "object",
         "required": [
@@ -1279,6 +1326,7 @@
           }
         }
       },
+
       "ProjectResponse": {
         "type": "object",
         "properties": {
@@ -1296,6 +1344,7 @@
           }
         }
       },
+
       "CreateTaskRequest": {
         "type": "object",
         "required": [
@@ -1305,6 +1354,7 @@
         "properties": {
           "project_id": {
             "type": "integer",
+            "minimum": 1,
             "example": 1
           },
           "title": {
@@ -1323,6 +1373,7 @@
           }
         }
       },
+
       "UpdateTaskRequest": {
         "type": "object",
         "required": [
@@ -1332,6 +1383,7 @@
         "properties": {
           "project_id": {
             "type": "integer",
+            "minimum": 1,
             "example": 1
           },
           "title": {
@@ -1349,6 +1401,7 @@
           }
         }
       },
+
       "TaskResponse": {
         "type": "object",
         "properties": {
@@ -1358,6 +1411,7 @@
           },
           "project_id": {
             "type": "integer",
+            "minimum": 1,
             "example": 1
           },
           "title": {
@@ -1366,15 +1420,28 @@
           },
           "status": {
             "type": "string",
+            "enum": [
+              "pending",
+              "in_progress",
+              "completed"
+            ],
             "example": "pending"
           }
         }
       },
+
       "ErrorResponse": {
         "type": "object",
+        "required": [
+          "error"
+        ],
         "properties": {
           "error": {
             "type": "object",
+            "required": [
+              "code",
+              "message"
+            ],
             "properties": {
               "code": {
                 "type": "string",
@@ -1388,8 +1455,12 @@
           }
         }
       },
+
       "HealthResponse": {
         "type": "object",
+        "required": [
+          "status"
+        ],
         "properties": {
           "status": {
             "type": "string",

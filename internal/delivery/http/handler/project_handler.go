@@ -142,6 +142,7 @@ func (h *ProjectHandler) Update(w http.ResponseWriter, r *http.Request) {
 		ID:          uint(id),
 		Name:        req.Name,
 		Description: req.Description,
+		Version:     req.Version,
 	}
 
 	if err := h.usecase.Update(r.Context(), project); err != nil {

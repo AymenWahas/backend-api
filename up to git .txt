@@ -1,3 +1,14 @@
 git add .
 git commit -m "update API"
 git push
+git status
+git push -u origin day9-messaging
+
+
+BEGIN
+
+INSERT INTO tasks
+INSERT INTO outbox_events
+
+
+COMMIT

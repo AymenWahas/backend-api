@@ -8,4 +8,5 @@ type CreateProjectRequest struct {
 type UpdateProjectRequest struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
+	Version     uint   `json:"version"`
 }

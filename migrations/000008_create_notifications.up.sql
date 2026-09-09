@@ -1,0 +1,11 @@
+CREATE TABLE IF NOT EXISTS notifications (
+    id BIGSERIAL PRIMARY KEY,
+
+    event_id TEXT NOT NULL UNIQUE,
+
+    task_id BIGINT NOT NULL,
+
+    message TEXT NOT NULL,
+
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
