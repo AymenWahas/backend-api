@@ -10,10 +10,48 @@ import (
 	"backend-api/internal/delivery/http/middleware"
 )
 
-func NewRouter(h *handler.Handler, requestTimeout time.Duration) http.Handler {
-	// API routes
+func NewRouter(
+	h *handler.Handler,
+	authHandler *handler.AuthHandler,
+	requestTimeout time.Duration,
+	jwtSecret string,
+) http.Handler { // API routes
 	apiMux := http.NewServeMux()
 	apiMux.HandleFunc("GET /health", h.Health)
+
+	// Auth
+	apiMux.Handle(
+		"POST /api/v1/auth/register",
+		middleware.JSONContentType(
+			http.HandlerFunc(authHandler.Register),
+		),
+	)
+	apiMux.Handle(
+		"POST /api/v1/auth/login",
+		middleware.JSONContentType(
+			http.HandlerFunc(authHandler.Login),
+		),
+	)
+	apiMux.Handle(
+		"POST /api/v1/auth/refresh",
+		middleware.JSONContentType(
+			http.HandlerFunc(authHandler.Refresh),
+		),
+	)
+	apiMux.Handle(
+		"POST /api/v1/auth/logout",
+		middleware.JSONContentType(
+			http.HandlerFunc(authHandler.Logout),
+		),
+	)
+
+	apiMux.Handle(
+		"GET /api/v1/me",
+		middleware.Auth(jwtSecret)(
+			http.HandlerFunc(authHandler.Me),
+		),
+	)
+	//employee
 	apiMux.Handle(
 		"POST /api/v1/employees",
 		middleware.JSONContentType(

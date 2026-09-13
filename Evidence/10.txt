@@ -1,0 +1,710 @@
+Publish
+   ↓
+Redis Stream
+   ↓
+Consumer Group
+   ↓
+XReadGroup
+   ↓
+Worker
+   ↓
+PostgreSQL
+   ↓
+XACK
+|||||||||||||
+error
+|||||||||||||
+Process ❌
+   ↓
+Pending
+   ↓
+XAUTOCLAIM
+   ↓
+Retry
+   ↓
+Retry
+   ↓
+Retry #3
+   ↓
+DLQ
+   ↓
+XACK original
+   ↓
+Delete retry counter
+
+
+|||||||||||||||||||||||||||||||||||||||||||||||
+cat > Evidence/10.txt <<'EOF'
+Day 10 - Events and Streams
+===========================
+
+1. Objective
+-------------
+
+Demonstrate event-driven processing using Redis Streams, Consumer Groups,
+at-least-once delivery, idempotency, retries, XAUTOCLAIM recovery,
+Dead Letter Queue (DLQ), and PostgreSQL persistence.
+
+Day 10 also reviews advanced event-driven architecture concepts including:
+
+- Queue vs Pub/Sub vs Stream
+- Ordering
+- Replay
+- Schema Evolution
+- Outbox
+- CDC
+- Saga
+- CQRS
+- Event Sourcing
+
+
+2. Implementation Evidence
+---------------------------
+
+The application uses Redis Streams for task events.
+
+Main stream:
+
+    task-events
+
+Consumer group:
+
+    notifications
+
+The notification worker consumes task.created events and creates
+notifications in PostgreSQL.
+
+
+3. Redis Stream Query Evidence
+------------------------------
+
+Command:
+
+    redis-cli XINFO STREAM task-events
+
+Observed result:
+
+    length = 4
+    entries-added = 4
+    groups = 1
+    first-entry = 1788961559617-0
+    last-entry = 1788962792798-0
+
+The latest stream entry contained a task.created event for task_id 10.
+
+Example event:
+
+    {
+      "event_id": "1177b16c-0d58-4681-a486-494a7e187ff6",
+      "event_type": "task.created",
+      "task_id": 10,
+      "created_at": "2026-09-09T14:06:32.79607428Z"
+    }
+
+This proves that task events are stored in the Redis Stream.
+
+
+4. Consumer Group Query Evidence
+--------------------------------
+
+Command:
+
+    redis-cli XINFO GROUPS task-events
+
+Observed result:
+
+    name = notifications
+    consumers = 1
+    pending = 0
+    last-delivered-id = 1788962792798-0
+    entries-read = 4
+    lag = 0
+
+This proves that the notification worker has a Redis Consumer Group
+and that all currently delivered messages have been acknowledged.
+
+
+5. Pending Message Query Evidence
+----------------------------------
+
+Command:
+
+    redis-cli XPENDING task-events notifications
+
+Observed result:
+
+    pending = 0
+
+This confirms that there are no unacknowledged messages currently
+pending for the notifications consumer group.
+
+
+6. PostgreSQL Query Evidence
+----------------------------
+
+Command:
+
+    docker exec employee-db psql -U postgres -d employee_db \
+      -c "SELECT event_id, task_id, message FROM notifications ORDER BY id DESC LIMIT 5;"
+
+Observed rows included:
+
+    task_id 10
+    message: Task 10 was created
+
+    task_id 9
+    message: Task 9 was created
+
+Test-generated notification rows were also present.
+
+This proves that consumed task events can produce persistent
+notification records in PostgreSQL.
+
+
+7. Demonstration - Idempotency
+------------------------------
+
+Command:
+
+    go test -count=1 -v ./internal/worker
+
+Test:
+
+    TestNotificationWorkerIntegration
+
+Observed:
+
+    consumer group created
+    event published
+    event consumed
+    notification event processed
+    PostgreSQL notification created successfully
+    testing duplicate event
+
+The duplicate event produced a PostgreSQL UNIQUE constraint violation
+for notifications_event_id_key.
+
+The repository mapped SQLSTATE 23505 to:
+
+    ErrNotificationAlreadyExists
+
+The worker then logged:
+
+    duplicate notification skipped
+
+The test concluded:
+
+    idempotency verified: duplicate event did not create another notification
+
+Result:
+
+    PASS
+
+This demonstrates that duplicate event delivery does not create a
+second notification.
+
+
+8. Demonstration - Retry and Pending State
+------------------------------------------
+
+Test:
+
+    TestNotificationWorkerRetryAndDLQ
+
+A deliberately invalid event was published.
+
+Observed:
+
+    invalid event published
+
+Attempt 1:
+
+    failed to decode task.created event
+
+The test then verified:
+
+    attempt 1 verified: message remains pending
+
+This demonstrates that failed processing does not immediately ACK
+the message.
+
+
+9. Demonstration - XAUTOCLAIM Recovery
+--------------------------------------
+
+The test configured:
+
+    claimIdle = 100ms
+
+After the message became idle, the worker reclaimed it using
+XAUTOCLAIM.
+
+Observed:
+
+    attempt 2 verified
+
+Then another reclaim was performed.
+
+Observed:
+
+    attempt 3
+
+This demonstrates recovery of pending messages through XAUTOCLAIM.
+
+
+10. Demonstration - Dead Letter Queue
+-------------------------------------
+
+After three failed attempts, the worker moved the message to:
+
+    task-events:dlq
+
+Observed:
+
+    message moved to DLQ
+    attempts=3
+    dlq_stream=task-events:dlq
+
+The test verified:
+
+    exactly 1 DLQ message
+
+The DLQ message contained:
+
+    original_message_id
+    attempts
+
+The test verified:
+
+    original_message_id = original message ID
+    attempts = 3
+
+Result:
+
+    DLQ verified: message moved after 3 attempts
+
+
+11. Demonstration - ACK After DLQ
+---------------------------------
+
+After successful DLQ insertion, the original message was acknowledged.
+
+Observed:
+
+    ACK verified: original message removed from Pending Entries
+
+The test also verified that the retry counter was deleted.
+
+Observed:
+
+    retry counter cleanup verified
+
+This proves that a permanently failed message is removed from the
+pending state after being safely moved to the DLQ.
+
+
+12. Full Project Test Evidence
+------------------------------
+
+Command:
+
+    go test -count=1 ./...
+
+Observed result:
+
+    backend-api/internal/database        PASS
+    backend-api/internal/delivery/http/dto       PASS
+    backend-api/internal/delivery/http/handler   PASS
+    backend-api/internal/delivery/http/middleware PASS
+    backend-api/internal/repository/postgres      PASS
+    backend-api/internal/usecase                   PASS
+    backend-api/internal/worker                    PASS
+
+Overall result:
+
+    PASS
+
+No package failed.
+
+
+13. Delivery Semantics
+----------------------
+
+The worker implements an at-least-once processing model.
+
+Reason:
+
+    Message is consumed
+        |
+        v
+    Processing
+        |
+        +---- success ----> XACK
+        |
+        +---- failure ----> remains Pending
+                              |
+                              v
+                          XAUTOCLAIM
+                              |
+                              v
+                            Retry
+
+The same business event may therefore be delivered more than once.
+
+Idempotency is used to make duplicate processing safe.
+
+
+14. Queue vs Pub/Sub vs Stream
+------------------------------
+
+Queue:
+
+    Messages are normally processed by one consumer.
+
+Pub/Sub:
+
+    Messages are delivered to active subscribers and are generally
+    not centered around persistent pending-message processing.
+
+Stream:
+
+    Messages are stored in an ordered stream and can be consumed
+    through Consumer Groups with acknowledgement and pending tracking.
+
+This project uses Redis Streams because the worker requires:
+
+    - Consumer Groups
+    - ACK
+    - Pending message tracking
+    - Retry
+    - XAUTOCLAIM
+    - DLQ support
+
+
+15. Ordering
+------------
+
+Redis Stream entries have ordered IDs.
+
+However:
+
+    Stream order != guaranteed processing completion order
+
+With multiple consumers or retries, a later event may complete before
+an earlier event.
+
+The current application has one notification consumer, so the current
+deployment does not demonstrate parallel consumer ordering issues.
+
+
+16. Replay
+----------
+
+Redis Stream entries are not automatically deleted by XACK.
+
+XACK removes the message from the Pending Entries List.
+
+The application currently has no explicit replay command or replay API.
+
+Therefore:
+
+    Replay workflow: Not implemented
+
+
+17. Schema Evolution
+--------------------
+
+The event contains:
+
+    event_type
+
+However, the current implementation does not contain an explicit event
+schema version or schema registry.
+
+Therefore:
+
+    Schema versioning: Not implemented
+
+
+18. Outbox Pattern
+------------------
+
+The current task creation flow performs:
+
+    PostgreSQL INSERT
+        |
+        v
+    Redis event publish
+
+These are separate operations.
+
+Failure window:
+
+    PostgreSQL INSERT succeeds
+        |
+        v
+    Redis publish fails
+        |
+        v
+    Task exists but event is missing
+
+This is a dual-write consistency gap.
+
+The Outbox Pattern would store the event in PostgreSQL in the same
+transaction as the business change and publish it asynchronously.
+
+
+19. CDC
+-------
+
+Change Data Capture is not implemented.
+
+CDC could capture database changes and publish them to an event pipeline.
+
+Current project status:
+
+    CDC: Not implemented
+
+
+20. Saga
+--------
+
+Saga is not implemented.
+
+Saga is a distributed workflow pattern where a business operation is
+split into local transactions with compensating actions when later
+steps fail.
+
+Current project status:
+
+    Saga: Not implemented
+
+
+21. CQRS
+--------
+
+CQRS is not implemented.
+
+CQRS separates command/write models from query/read models.
+
+Current project uses a conventional shared domain and persistence model.
+
+Current project status:
+
+    CQRS: Not implemented
+
+
+22. Event Sourcing
+------------------
+
+Event Sourcing is not implemented.
+
+The current system stores the current state of entities in PostgreSQL.
+The event stream is used for event processing, not as the primary
+source of truth for rebuilding entity state.
+
+Current project status:
+
+    Event Sourcing: Not implemented
+
+
+23. Score Sheet
+---------------
+
+Scoring:
+
+    Redis Streams                    5/5
+    Consumer Groups                  5/5
+    At-least-once Processing         5/5
+    ACK                              5/5
+    Pending Message Handling         5/5
+    Idempotency                      5/5
+    Retry                            5/5
+    XAUTOCLAIM                       5/5
+    Dead Letter Queue                5/5
+    PostgreSQL Side Effect           5/5
+    Ordering                         3/5
+    Replay                           2/5
+    Schema Evolution                 2/5
+    Outbox                           2/5
+    CDC                              1/5
+    Saga                             1/5
+    CQRS                             1/5
+    Event Sourcing                   1/5
+
+The lower scores do not represent failures in the implemented worker.
+They represent advanced patterns that were reviewed conceptually but
+were intentionally not implemented.
+
+
+24. Remediation List
+--------------------
+
+R1 - Outbox / Dual Write Gap
+----------------------------
+Priority: High
+
+Problem:
+
+    PostgreSQL task creation and Redis event publishing are separate
+    operations.
+
+Risk:
+
+    Task can be committed while its event fails to publish.
+
+Remediation:
+
+    Add an Outbox table and publish pending outbox events asynchronously.
+
+
+R2 - Explicit Replay Workflow
+-----------------------------
+Priority: Medium
+
+Problem:
+
+    No application-level replay command exists.
+
+Remediation:
+
+    Add a controlled replay mechanism for selected stream ranges or
+    DLQ messages.
+
+
+R3 - Event Schema Versioning
+----------------------------
+Priority: Medium
+
+Problem:
+
+    Events do not contain an explicit schema version.
+
+Remediation:
+
+    Add an event version field and define backward-compatible schema
+    evolution rules.
+
+
+R4 - DLQ Duplicate Protection
+-----------------------------
+Priority: Medium
+
+Problem:
+
+    If DLQ insertion succeeds but XACK fails, the same failed message
+    could potentially be written to the DLQ more than once.
+
+Remediation:
+
+    Add DLQ idempotency using the original message ID.
+
+
+R5 - Graceful Worker Shutdown
+-----------------------------
+Priority: Medium
+
+Problem:
+
+    The application starts the worker with context.Background().
+
+Remediation:
+
+    Use an application lifecycle context and cancel the worker during
+    graceful server shutdown.
+
+
+R6 - Consumer/Partition Scaling
+-------------------------------
+Priority: Low
+
+Problem:
+
+    Current implementation uses one consumer for the notification group.
+
+Remediation:
+
+    Run multiple consumers when throughput requirements increase and
+    explicitly document ordering guarantees.
+
+
+25. Git / Release Evidence
+--------------------------
+
+Current branch:
+
+    day9-messaging2
+
+Current HEAD:
+
+    0eb7242 update API
+
+Current tags:
+
+    day5
+    v1.0.0
+
+Day 10 has not yet been committed or tagged at the time this evidence
+was generated.
+
+Release status:
+
+    Pending Day 10 commit and tag.
+
+
+26. Final Verification
+-----------------------
+
+Worker tests:
+
+    go test -count=1 -v ./internal/worker
+
+Result:
+
+    PASS
+
+Full project:
+
+    go test -count=1 ./...
+
+Result:
+
+    PASS
+
+Redis:
+
+    task-events stream exists
+    notifications consumer group exists
+    pending = 0
+
+PostgreSQL:
+
+    notification records exist for processed task events.
+
+
+27. Conclusion
+--------------
+
+Day 10 implementation is successfully demonstrated.
+
+The project now provides:
+
+    Redis Streams
+    Consumer Groups
+    At-least-once processing
+    ACK
+    Pending message tracking
+    Idempotent consumer behavior
+    Retry
+    XAUTOCLAIM recovery
+    Dead Letter Queue
+    PostgreSQL persistence
+    Retry counter cleanup
+
+The advanced patterns Outbox, CDC, Saga, CQRS, and Event Sourcing were
+reviewed architecturally but are intentionally not implemented.
+
+The main technical remediation identified for future work is the
+PostgreSQL-to-Redis dual-write gap, which can be addressed with the
+Outbox Pattern.
+EOF

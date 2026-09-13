@@ -28,9 +28,12 @@ type fakeEmployeeRepository struct {
 	getAllErr    error
 	getAllCalled bool
 
-	deleteCalled bool
-	deleteID     int
-	deleteErr    error
+	deleteCalled     bool
+	deleteID         int
+	deleteErr        error
+	employeeByEmail  domain.Employee
+	getByEmailErr    error
+	getByEmailCalled bool
 
 	receivedContext context.Context
 }
@@ -62,7 +65,18 @@ func (f *fakeEmployeeRepository) GetByID(
 
 	return f.employeeByID, nil
 }
+func (f *fakeEmployeeRepository) GetByEmail(
+	ctx context.Context,
+	email string,
+) (domain.Employee, error) {
+	f.getByEmailCalled = true
 
+	if f.getByEmailErr != nil {
+		return domain.Employee{}, f.getByEmailErr
+	}
+
+	return f.employeeByEmail, nil
+}
 func (f *fakeEmployeeRepository) GetAll(
 	ctx context.Context,
 	filter repository.EmployeeFilter,

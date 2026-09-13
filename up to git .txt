@@ -1,8 +1,13 @@
 git add .
-git commit -m "update API"
+git commit -m "day9: ..."
 git push
-git status
+
+
 git push -u origin day9-messaging
+
+
+git tag v0.10.0
+git push origin v0.10.0
 
 
 BEGIN

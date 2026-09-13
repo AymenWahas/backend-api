@@ -71,6 +71,7 @@ func (h *Handler) CreateEmployee(w http.ResponseWriter, r *http.Request) {
 
 	// call usecase to create employee
 	created, err := h.usecase.CreateEmployee(r.Context(), employee)
+
 	if err != nil {
 		if errors.Is(err, usecase.ErrInvalidEmployee) {
 			response.WriteError(

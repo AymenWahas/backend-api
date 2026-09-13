@@ -9,7 +9,7 @@ import (
 	"backend-api/internal/cache"
 	"backend-api/internal/config"
 	"backend-api/internal/database"
-	httpdelivery "backend-api/internal/delivery/http"
+	httpRouter "backend-api/internal/delivery/http"
 	"backend-api/internal/delivery/http/handler"
 	"backend-api/internal/messaging"
 	"backend-api/internal/repository/postgres"
@@ -71,6 +71,8 @@ func main() {
 	projectRepo := postgres.NewProjectRepository(db)
 	taskRepo := postgres.NewTaskRepository(db)
 	notificationRepo := postgres.NewNotificationRepository(db)
+	userRepo := postgres.NewUserRepository(db)
+	authSessionRepo := postgres.NewAuthSessionRepository(db)
 
 	// Usecases
 	employeeUC := usecase.NewEmployeeUsecase(
@@ -85,6 +87,14 @@ func main() {
 	taskUC := usecase.NewTaskUsecase(
 		taskRepo,
 		eventPublisher,
+	)
+
+	authUC := usecase.NewAuthUsecase(
+		employeeRepo,
+		authSessionRepo,
+		userRepo,
+		cfg.JWTSecret,
+		cfg.AccessTokenTTL,
 	)
 
 	// Notification Worker
@@ -103,17 +113,21 @@ func main() {
 		}
 	}()
 
-	// HTTP Handler
+	// HTTP Handlers
 	h := handler.NewHandler(
 		employeeUC,
 		projectUC,
 		taskUC,
 	)
 
+	authHandler := handler.NewAuthHandler(authUC)
+
 	// Router
-	router := httpdelivery.NewRouter(
+	router := httpRouter.NewRouter(
 		h,
+		authHandler,
 		cfg.RequestTimeout,
+		cfg.JWTSecret,
 	)
 
 	// Port

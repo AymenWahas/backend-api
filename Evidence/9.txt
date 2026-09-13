@@ -1,4 +1,4 @@
-```text
+
 DAY 9 — MESSAGING, WORKERS, RETRIES, DLQ, IDEMPOTENCY
 
 Project: backend-api
@@ -77,9 +77,9 @@ ok      backend-api/internal/worker     0.460s
 
 RESULT: RETRY + DLQ VERIFIED
 
-============================================================
+=====================
 4. FULL TESTS
-============================================================
+========================
 
 Command:
 
@@ -130,4 +130,3 @@ Full Tests                  PASS
 go vet                      PASS
 
 DAY 9 STATUS: COMPLETED
-```

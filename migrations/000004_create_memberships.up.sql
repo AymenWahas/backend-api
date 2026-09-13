@@ -2,6 +2,7 @@ CREATE TABLE IF NOT EXISTS memberships (
     employee_id BIGINT NOT NULL,
     project_id BIGINT NOT NULL,
     role TEXT NOT NULL DEFAULT 'member',
+    
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     PRIMARY KEY (employee_id, project_id),

@@ -36,7 +36,7 @@ func (p *RedisStreamPublisher) PublishTaskCreated(
 		ctx,
 		&redis.XAddArgs{
 			Stream: TaskEventsStream,
-			ID:     "*",
+			ID:     "*", // redias will generate a unique ID for the message
 			Values: map[string]interface{}{
 				"event": string(data),
 			},

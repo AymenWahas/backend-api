@@ -39,7 +39,12 @@ func (f *fakeEmployeeRepository) GetByID(
 ) (domain.Employee, error) {
 	return domain.Employee{}, errors.New("not implemented")
 }
-
+func (f *fakeEmployeeRepository) GetByEmail(
+	ctx context.Context,
+	email string,
+) (domain.Employee, error) {
+	return domain.Employee{}, errors.New("not implemented")
+}
 func (f *fakeEmployeeRepository) GetAll(
 	ctx context.Context,
 	filter repository.EmployeeFilter,

@@ -1,0 +1,210 @@
+&&&&&&&&&&&&&&&&&&&&&&&&&7
+1 Authentication test
+&&&&&&&&&&&&&&&&&&&&
+Password hashing
+        ↓
+        ✅
+
+Auth middleware
+        ↓
+ ┌──────┼────────┐
+ ↓      ↓        ↓
+No     Invalid   Valid
+token   token    token
+ ↓       ↓        ↓
+401     401      200
+                ↓
+          UserID + EmployeeID
+          داخل Context
+
+
+||||||||||||||||||||
+2 No plaintext passwords.
+|||||||||||||||||||||||||||||||||
+ayman-wahas@ayman-wahas:~/backend-api$ gofmt -w internal/auth/password.go
+go test ./...
+?       backend-api/cmd/api     [no test files]
+?       backend-api/internal/auth       [no test files]
+?       backend-api/internal/cache      [no test files]
+?       backend-api/internal/config     [no test files]
+ok      backend-api/internal/database   0.377s
+?       backend-api/internal/delivery/http      [no test files]
+ok      backend-api/internal/delivery/http/dto  (cached)
+ok      backend-api/internal/delivery/http/handler      0.003s
+ok      backend-api/internal/delivery/http/middleware   (cached)
+?       backend-api/internal/delivery/http/response     [no test files]
+?       backend-api/internal/domain     [no test files]
+?       backend-api/internal/event      [no test files]
+?       backend-api/internal/messaging  [no test files]
+?       backend-api/internal/repository [no test files]
+?       backend-api/internal/repository/memory  [no test files]
+ok      backend-api/internal/repository/postgres        0.449s
+ok      backend-api/internal/usecase    0.076s
+ok      backend-api/internal/worker     0.486s
+ayman-wahas@ayman-wahas:~/backend-api$ gofmt -w internal/auth/password_test.go
+go test ./internal/auth -v
+=== RUN   TestPasswordHashing
+--- PASS: TestPasswordHashing (0.22s)
+PASS
+ok      backend-api/internal/auth       0.227s
+password != hash
+CheckPassword(correct password) → success
+CheckPassword(wrong password)   → failure
+
+export JWT_SECRET="my-development-secret-2026"
+export ACCESS_TOKEN_TTL="15m"
+export JWT_SECRET="my-development-secret-2026"
+export ACCESS_TOKEN_TTL="15m"
+
+
+##################
+Sanitized Logs
+#########################
+HTTP method
+Request path
+HTTP status
+Request duration
+Request ID
+
+Example:
+
+POST /api/v1/auth/login → 200
+
+
+
+__&&&&&&&&&&&&&&&&&&&&7
+live sycle session
+_&&&&&&&&&&&&&&&&&&&&&&&&7
+              ┌──────────────┐
+              │    Login     │
+              └──────┬───────┘
+                     ↓
+                 Session A
+                     ↓
+             Refresh Token A
+                     │
+                     ▼
+              ┌──────────────┐
+              │   Refresh    │
+              └──────┬───────┘
+                     ↓
+                 Session B
+                ↙           ↘
+       A = Revoked ❌      Refresh Token B
+                                │
+                                ▼
+                         ┌──────────────┐
+                         │   Refresh    │
+                         └──────┬───────┘
+                                ↓
+                            Session C
+                           ↙           ↘
+                  B = Revoked ❌    Refresh Token C
+                                         │
+                                         ▼
+                                     Logout
+                                         ↓
+                                  C = Revoked ❌
+
+
+
+
+
+
+curl -k -i https://localhost:8443/api/v1/employees \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Auth Test User",
+    "email": "auth2@example.com",
+    "department": "Engineering"
+  }'
+
+  curl -k -i https://localhost:8443/api/v1/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "auth2@example.com",
+    "password": "MyPassword123"
+  }'
+
+curl -k -i https://localhost:8443/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "auth2@example.com",
+    "password": "MyPassword123"
+  }'
+
+curl -k -i https://localhost:8443/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "auth2@example.com",
+    "password": "MyPassword123"
+  }'
+
+
+  curl -k -i https://localhost:8443/api/v1/me \
+  -H "Authorization: Bearer ACCESS_TOKEN"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  ayman-wahas@ayman-wahas:~/backend-api$ curl -k -X POST https://localhost:8443/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "auth@example.com",
+    "password": "MyStrongPassword123!"
+  }'
+{"access_token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoxLCJlbXBsb3llZV9pZCI6MTA3NywiZXhwIjoxNzg5MzI1MTMzLCJpYXQiOjE3ODkzMjQyMzN9.8_253SR7fgJVcRU1xtgaGEwq4eLexiNUhVW5yPh-81I",
+"refresh_token":"3179e1df745fe4322f102085916ccc6bdb295cbfc75d0b26970453b105c2942d"}
+
+ayman-wahas@ayman-wahas:~/backend-api$ curl -k -X POST https://localhost:8443/api/v1/auth/refresh \
+  -H "Content-Type: application/json" \
+  -d '{
+    "refresh_token": "3179e1df745fe4322f102085916ccc6bdb295cbfc75d0b26970453b105c2942d"
+  }'
+{"access_token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoxLCJlbXBsb3llZV9pZCI6MTA3NywiZXhwIjoxNzg5MzI1MTgzLCJpYXQiOjE3ODkzMjQyODN9.s9soM-eBDND-DMHeYHH2gXkEtX5NDNQL68Wf1Y5UFl8",
+"refresh_token":"581c1fe9a296bbfc789134f1471b6a15abef6ea48c3098897f6024736be877b4"}
+
+
+ayman-wahas@ayman-wahas:~/backend-api$ curl -k -X POST https://localhost:8443/api/v1/auth/refresh   -H "Content-Type: application/json"   -d '{
+    "refresh_token": "3179e1df745fe4322f102085916ccc6bdb295cbfc75d0b26970453b105c2942d"
+  }'
+{"error":{"code":"INVALID_REFRESH_TOKEN","message":"invalid or expired refresh token"}}
+ayman-wahas@ayman-wahas:~/backend-api$ 
+
+إذن ماذا تعلمنا؟
+
+Refresh Token ليس مثل Access Token.
+
+Access Token:
+
+قصير العمر
+↓
+يُستخدم للوصول إلى API
+
+Refresh Token:
+
+أطول عمرًا
+↓
+يُستخدم للحصول على Access Token جديد
+↓
+لكن بعد استخدامه يتم تدويره
+↓
+القديم يصبح غير صالح
+
+وهذا يحمي من حالة سرقة Refresh Token؛ فإذا تم استخدامه، لا يبقى صالحًا إلى أجل الجلسة بالكامل.

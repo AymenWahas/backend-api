@@ -22,12 +22,14 @@ type Config struct {
 	ConnMaxIdleTime time.Duration
 
 	RequestTimeout time.Duration
+
+	JWTSecret      string
+	AccessTokenTTL time.Duration
 }
 
 func Load() (Config, error) {
 	cfg := Config{
-		Port: getEnv("PORT", "8443"),
-
+		Port:       getEnv("PORT", "8443"),
 		DBHost:     getEnv("DB_HOST", "localhost"),
 		DBPort:     getEnv("DB_PORT", "5434"),
 		DBUser:     getEnv("DB_USER", "postgres"),
@@ -47,6 +49,13 @@ func Load() (Config, error) {
 		ConnMaxIdleTime: getEnvDuration(
 			"DB_CONN_MAX_IDLE_TIME",
 			5*time.Minute,
+		),
+
+		JWTSecret: getEnv("JWT_SECRET", ""),
+
+		AccessTokenTTL: getEnvDuration(
+			"ACCESS_TOKEN_TTL",
+			15*time.Minute,
 		),
 	}
 
@@ -81,7 +90,9 @@ func validate(cfg Config) error {
 	}
 
 	if cfg.RequestTimeout <= 0 {
-		return fmt.Errorf("REQUEST_TIMEOUT must be greater than zero")
+		return fmt.Errorf(
+			"REQUEST_TIMEOUT must be greater than zero",
+		)
 	}
 
 	if cfg.MaxOpenConns <= 0 {
@@ -99,6 +110,18 @@ func validate(cfg Config) error {
 	if cfg.MaxIdleConns > cfg.MaxOpenConns {
 		return fmt.Errorf(
 			"DB_MAX_IDLE_CONNS cannot be greater than DB_MAX_OPEN_CONNS",
+		)
+	}
+
+	if cfg.JWTSecret == "" {
+		return fmt.Errorf(
+			"JWT_SECRET is required",
+		)
+	}
+
+	if cfg.AccessTokenTTL <= 0 {
+		return fmt.Errorf(
+			"ACCESS_TOKEN_TTL must be greater than zero",
 		)
 	}
 
@@ -126,7 +149,6 @@ func getEnvInt(
 	}
 
 	result, err := strconv.Atoi(value)
-
 	if err != nil {
 		return 0, fmt.Errorf(
 			"%s must be an integer: %w",
@@ -149,7 +171,6 @@ func getEnvDuration(
 	}
 
 	result, err := time.ParseDuration(value)
-
 	if err != nil {
 		return fallback
 	}

@@ -31,6 +31,26 @@ func mapEmployeeDBError(err error) error {
 
 	return err
 }
+func (r *EmployeeRepository) GetByEmail(
+	ctx context.Context,
+	email string,
+) (domain.Employee, error) {
+	var employee domain.Employee
+
+	result := r.db.WithContext(ctx).
+		Where("email = ?", email).
+		First(&employee)
+
+	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+		return domain.Employee{}, domain.ErrEmployeeNotFound
+	}
+
+	if result.Error != nil {
+		return domain.Employee{}, result.Error
+	}
+
+	return employee, nil
+}
 
 // Create creates a new employee in PostgreSQL.
 func (r *EmployeeRepository) Create(

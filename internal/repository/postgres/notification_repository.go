@@ -20,7 +20,7 @@ func NewNotificationRepository(db *gorm.DB) *NotificationRepository {
 		db: db,
 	}
 }
-
+// transaction error code to domain error mapping
 func mapNotificationDBError(err error) error {
 	var pgErr *pgconn.PgError
 

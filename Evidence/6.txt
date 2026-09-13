@@ -34,6 +34,8 @@ task_tags
 tags
 \\\\\\\\\\\\\\\
 migratiom file 
+
+
 migrations/
 ├── 000001_add_workhub_fields_to_employees.up.sql
 ├── 000001_add_workhub_fields_to_employees.down.sql
@@ -64,9 +66,9 @@ tags
 task_tags
 
 
-#########
-Representative SQL Querie__
-
+#########____________
+Representative SQL Query
+#####################
 ayman-wahas@ayman-wahas:~/backend-api$ psql -U postgres -d employee_db -h localhost -p 5434
 Password for user postgres: 
 psql (16.15 (Ubuntu 16.15-0ubuntu0.24.04.1), server 15.19)
@@ -98,7 +100,11 @@ JOIN projects p
     ON p.id = m.project_id;
  employee_id | employee_name | project_id | project_name | role 
 -------------+---------------+------------+--------------+------
+
 (0 rows)
+___________+++++++++++++++++++++______________
+Memberships
++++++++++++++++++++++++++++
 
 employee_db=# SELECT
     t.id AS task_id,
@@ -120,16 +126,26 @@ employee_db=#
 |||||||||||||||||
 employee_db=# BEGIN;
 
+
+$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+Foreign Key Test
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+
 INSERT INTO projects (name, description, owner_id)
 VALUES ('Invalid Project', 'FK test', 999999);
 
 ROLLBACK;
 BEGIN
+
 ERROR:  insert or update on table "projects" violates foreign key constraint "fk_projects_owner"
 DETAIL:  Key (owner_id)=(999999) is not present in table "employees".
 ROLLBACK
 employee_db=# BEGIN;
 
+
+^^^^^^^^^^^^^^^^^^^^^^^
+Foreign Key Test
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^6
 INSERT INTO tasks (project_id, title, status)
 VALUES (999999, 'Invalid Task', 'pending');
 
@@ -139,3 +155,26 @@ ERROR:  insert or update on table "tasks" violates foreign key constraint "fk_pr
 DETAIL:  Key (project_id)=(999999) is not present in table "projects".
 ROLLBACK
 employee_db=# 
+
+
+))))))))))))))))))))))))))0
+employee_db=*# INSERT INTO memberships (employee_id, project_id, role)
+VALUES (1052, 1, 'member');
+INSERT 0 1
+employee_db=*# SELECT
+    e.id AS employee_id,
+    e.name AS employee_name,
+    p.id AS project_id,
+    p.name AS project_name,
+    m.role
+FROM employees e
+JOIN memberships m
+    ON m.employee_id = e.id
+JOIN projects p
+    ON p.id = m.project_id
+WHERE e.id = 1052;
+ employee_id | employee_name | project_id |    project_name    |  role  
+-------------+---------------+------------+--------------------+--------
+        1052 | Day6 Employee |          1 | Cache Test Updated | member
+(1 row)
+|||||||||||||||\

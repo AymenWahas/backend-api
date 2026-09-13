@@ -2,17 +2,18 @@ DAY 4 — TESTING, QUALITY & EVIDENCE
 
 ==
 GREEN AUTOMATED CHECKS
-=
+=الاختبارات الآلية تمر.
+go vet لا يجد مشاكل واضحة.
+Race Detector لم يكتشف Data Race.
+تنسيق Go نظيف.
+لا توجد مشاكل whitespace في Git diff.
 go test ./...
 PASS
-
 go vet ./...
 PASS
-
 CGO_ENABLED=1 go test -race ./...
 PASS
 No WARNING: DATA RACE detected.
-
 gofmt -l .
 PASS
 No unformatted Go files.
@@ -29,7 +30,7 @@ TABLE-DRIVEN / USECASE TESTS
 Command:
 go test ./internal/usecase -v -count=1
 
-TestCreateEmployee:
+Test  CreateEmployee:
 - valid_employee_trims_spaces       PASS
 - empty_name                        PASS
 - empty_email                       PASS
@@ -45,7 +46,9 @@ TestUpdateEmployee:
 
 
 =================
-BENCHMARK
+BENCHMARK  يجيب عن:
+
+ما أداء CreateEmployeeRequest.Validate()؟
 =========
 
 Command:
@@ -60,7 +63,7 @@ BenchmarkCreateEmployeeRequestValidate-12
 PASS
 
 =====
-TEST STRATEGY
+TEST STRATEGY  
 =======
 
 The test strategy focuses on the main risks in the
@@ -81,7 +84,7 @@ Covered risks:
 
 
 ===============
-KNOWN GAPS
+KNOWN GAPS "نعرف ماذا اختبرنا، ونعرف ماذا لم نختبر."
 ==============================
 
 - No PostgreSQL integration test suite yet.

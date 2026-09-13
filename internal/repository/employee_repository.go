@@ -21,12 +21,14 @@ type EmployeeSort struct {
 type EmployeeRepository interface {
 	Create(ctx context.Context, employee domain.Employee) (domain.Employee, error)
 	GetByID(ctx context.Context, id int) (domain.Employee, error)
+	GetByEmail(ctx context.Context, email string) (domain.Employee, error)
 	GetAll(
 		ctx context.Context,
 		filter EmployeeFilter,
 		sort EmployeeSort,
 		offset, limit int,
 	) ([]domain.Employee, int, uint64, error)
+
 	Update(ctx context.Context, employee domain.Employee) (domain.Employee, error)
 	Delete(ctx context.Context, id int) error
 }
