@@ -15,8 +15,12 @@ func NewRouter(
 	authHandler *handler.AuthHandler,
 	requestTimeout time.Duration,
 	jwtSecret string,
-) http.Handler { // API routes
+	allowedOrigins string,
+) http.Handler {
+
+	// API routes
 	apiMux := http.NewServeMux()
+
 	apiMux.HandleFunc("GET /health", h.Health)
 
 	// Auth
@@ -26,18 +30,21 @@ func NewRouter(
 			http.HandlerFunc(authHandler.Register),
 		),
 	)
+
 	apiMux.Handle(
 		"POST /api/v1/auth/login",
 		middleware.JSONContentType(
 			http.HandlerFunc(authHandler.Login),
 		),
 	)
+
 	apiMux.Handle(
 		"POST /api/v1/auth/refresh",
 		middleware.JSONContentType(
 			http.HandlerFunc(authHandler.Refresh),
 		),
 	)
+
 	apiMux.Handle(
 		"POST /api/v1/auth/logout",
 		middleware.JSONContentType(
@@ -51,7 +58,8 @@ func NewRouter(
 			http.HandlerFunc(authHandler.Me),
 		),
 	)
-	//employee
+
+	// Employee
 	apiMux.Handle(
 		"POST /api/v1/employees",
 		middleware.JSONContentType(
@@ -59,8 +67,15 @@ func NewRouter(
 		),
 	)
 
-	apiMux.HandleFunc("GET /api/v1/employees", h.GetEmployees)
-	apiMux.HandleFunc("GET /api/v1/employees/{id}", h.GetEmployee)
+	apiMux.HandleFunc(
+		"GET /api/v1/employees",
+		h.GetEmployees,
+	)
+
+	apiMux.HandleFunc(
+		"GET /api/v1/employees/{id}",
+		h.GetEmployee,
+	)
 
 	apiMux.Handle(
 		"PUT /api/v1/employees/{id}",
@@ -69,52 +84,145 @@ func NewRouter(
 		),
 	)
 
-	apiMux.HandleFunc("DELETE /api/v1/employees/{id}", h.DeleteEmployee)
+	apiMux.HandleFunc(
+		"DELETE /api/v1/employees/{id}",
+		h.DeleteEmployee,
+	)
 
+	// Projects
 	apiMux.Handle(
 		"POST /api/v1/projects",
-		middleware.JSONContentType(
-			http.HandlerFunc(h.CreateProject),
+		middleware.Auth(jwtSecret)(
+			middleware.JSONContentType(
+				http.HandlerFunc(h.CreateProject),
+			),
 		),
 	)
 
-	apiMux.HandleFunc("GET /api/v1/projects", h.GetProjects)
-	apiMux.HandleFunc("GET /api/v1/projects/{id}", h.GetProject)
+	apiMux.Handle(
+		"GET /api/v1/projects",
+		middleware.Auth(jwtSecret)(
+			http.HandlerFunc(h.GetProjects),
+		),
+	)
+
+	apiMux.Handle(
+		"GET /api/v1/projects/{id}",
+		middleware.Auth(jwtSecret)(
+			http.HandlerFunc(h.GetProject),
+		),
+	)
+
+	apiMux.Handle(
+		"GET /api/v1/projects/{id}/members",
+		middleware.Auth(jwtSecret)(
+			middleware.JSONContentType(
+				http.HandlerFunc(h.GetProjectMembers),
+			),
+		),
+	)
+
+	apiMux.Handle(
+		"POST /api/v1/projects/{id}/members",
+		middleware.Auth(jwtSecret)(
+			middleware.JSONContentType(
+				http.HandlerFunc(h.AddProjectMember),
+			),
+		),
+	)
+
+	apiMux.Handle(
+		"PATCH /api/v1/projects/{id}/members/{employeeId}/role",
+		middleware.Auth(jwtSecret)(
+			middleware.JSONContentType(
+				http.HandlerFunc(h.UpdateProjectMemberRole),
+			),
+		),
+	)
+
+	apiMux.Handle(
+		"DELETE /api/v1/projects/{id}/members/{employeeId}",
+		middleware.Auth(jwtSecret)(
+			http.HandlerFunc(h.RemoveProjectMember),
+		),
+	)
 
 	apiMux.Handle(
 		"PUT /api/v1/projects/{id}",
-		middleware.JSONContentType(
-			http.HandlerFunc(h.UpdateProject),
+		middleware.Auth(jwtSecret)(
+			middleware.JSONContentType(
+				http.HandlerFunc(h.UpdateProject),
+			),
 		),
 	)
 
-	apiMux.HandleFunc("DELETE /api/v1/projects/{id}", h.DeleteProject)
-	//  tasks
+	apiMux.Handle(
+		"DELETE /api/v1/projects/{id}",
+		middleware.Auth(jwtSecret)(
+			http.HandlerFunc(h.DeleteProject),
+		),
+	)
+
+	// Tasks
 	apiMux.Handle(
 		"POST /api/v1/tasks",
-		middleware.JSONContentType(
-			http.HandlerFunc(h.CreateTask),
+		middleware.Auth(jwtSecret)(
+			middleware.JSONContentType(
+				http.HandlerFunc(h.CreateTask),
+			),
 		),
 	)
-	apiMux.HandleFunc("GET /api/v1/tasks", h.GetTasks)
-	apiMux.HandleFunc("GET /api/v1/tasks/{id}", h.GetTask)
 
-	apiMux.Handle("PUT /api/v1/tasks/{id}", middleware.JSONContentType(
-		http.HandlerFunc(h.UpdateTask),
-	),
+	apiMux.Handle(
+		"GET /api/v1/tasks",
+		middleware.Auth(jwtSecret)(
+			http.HandlerFunc(h.GetTasks),
+		),
 	)
 
-	apiMux.HandleFunc("DELETE /api/v1/tasks/{id}", h.DeleteTask)
+	apiMux.Handle(
+		"GET /api/v1/tasks/{id}",
+		middleware.Auth(jwtSecret)(
+			http.HandlerFunc(h.GetTask),
+		),
+	)
+
+	apiMux.Handle(
+		"PUT /api/v1/tasks/{id}",
+		middleware.Auth(jwtSecret)(
+			middleware.JSONContentType(
+				http.HandlerFunc(h.UpdateTask),
+			),
+		),
+	)
+
+	apiMux.Handle(
+		"DELETE /api/v1/tasks/{id}",
+		middleware.Auth(jwtSecret)(
+			http.HandlerFunc(h.DeleteTask),
+		),
+	)
+
 	// Main router
 	mux := http.NewServeMux()
 
 	// API
-	mux.Handle("/", middleware.AcceptJSON(apiMux))
+	mux.Handle(
+		"/",
+		middleware.AcceptJSON(apiMux),
+	)
 
 	// OpenAPI specification
-	mux.HandleFunc("GET /openapi.json", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "docs/openapi.json")
-	})
+	mux.HandleFunc(
+		"GET /openapi.json",
+		func(w http.ResponseWriter, r *http.Request) {
+			http.ServeFile(
+				w,
+				r,
+				"docs/openapi.json",
+			)
+		},
+	)
 
 	// Swagger UI
 	swaggerHandler := swaggerui.New(
@@ -123,13 +231,31 @@ func NewRouter(
 		"/swagger/",
 	)
 
-	mux.Handle("/swagger/", swaggerHandler)
+	mux.Handle(
+		"/swagger/",
+		swaggerHandler,
+	)
 
 	// Global middleware
-	return middleware.RequestID(
-		middleware.Recovery(
-			middleware.RequestLogger(
-				middleware.Timeout(requestTimeout)(mux),
+	return middleware.SecurityHeaders(
+		middleware.CORS(allowedOrigins)(
+			middleware.RateLimit(
+				20,
+				time.Minute,
+			)(
+				middleware.RequestSizeLimit(
+					1 << 20,
+				)(
+					middleware.RequestID(
+						middleware.Recovery(
+							middleware.RequestLogger(
+								middleware.Timeout(
+									requestTimeout,
+								)(mux),
+							),
+						),
+					),
+				),
 			),
 		),
 	)

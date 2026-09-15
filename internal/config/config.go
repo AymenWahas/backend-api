@@ -25,11 +25,14 @@ type Config struct {
 
 	JWTSecret      string
 	AccessTokenTTL time.Duration
+
+	AllowedOrigins string
 }
 
 func Load() (Config, error) {
 	cfg := Config{
-		Port:       getEnv("PORT", "8443"),
+		Port: getEnv("PORT", "8443"),
+
 		DBHost:     getEnv("DB_HOST", "localhost"),
 		DBPort:     getEnv("DB_PORT", "5434"),
 		DBUser:     getEnv("DB_USER", "postgres"),
@@ -51,11 +54,19 @@ func Load() (Config, error) {
 			5*time.Minute,
 		),
 
-		JWTSecret: getEnv("JWT_SECRET", ""),
+		JWTSecret: getEnv(
+			"JWT_SECRET",
+			"",
+		),
 
 		AccessTokenTTL: getEnvDuration(
 			"ACCESS_TOKEN_TTL",
 			15*time.Minute,
+		),
+
+		AllowedOrigins: getEnv(
+			"ALLOWED_ORIGINS",
+			"",
 		),
 	}
 

@@ -13,6 +13,10 @@
   ],
   "tags": [
     {
+      "name": "Auth",
+      "description": "Authentication and session management"
+    },
+    {
       "name": "Employees",
       "description": "Employee management"
     },
@@ -30,6 +34,204 @@
     }
   ],
   "paths": {
+    "/api/v1/auth/register": {
+      "post": {
+        "operationId": "registerUser",
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Register user",
+        "description": "Register a new user using employee email and password.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "User registered successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/login": {
+      "post": {
+        "operationId": "loginUser",
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Login user",
+        "description": "Authenticate a user and return a JWT set.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Login successful.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/refresh": {
+      "post": {
+        "operationId": "refreshToken",
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Refresh token",
+        "description": "Refresh an access token using a valid refresh token.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Token refreshed successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or expired refresh token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/logout": {
+      "post": {
+        "operationId": "logoutUser",
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Logout user",
+        "description": "Invalidate a refresh token.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LogoutRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Logged out successfully."
+          },
+          "401": {
+            "description": "Invalid refresh token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/me": {
+      "get": {
+        "operationId": "getCurrentUser",
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Get current user info",
+        "description": "Returns the authenticated user id and employee id.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current user retrieved successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CurrentUserResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/health": {
       "get": {
         "operationId": "healthCheck",
@@ -52,7 +254,6 @@
         }
       }
     },
-
     "/api/v1/employees": {
       "get": {
         "operationId": "listEmployees",
@@ -166,7 +367,6 @@
           }
         }
       },
-
       "post": {
         "operationId": "createEmployee",
         "tags": [
@@ -238,7 +438,6 @@
         }
       }
     },
-
     "/api/v1/employees/{id}": {
       "get": {
         "operationId": "getEmployee",
@@ -312,7 +511,6 @@
           }
         }
       },
-
       "put": {
         "operationId": "updateEmployee",
         "tags": [
@@ -405,7 +603,6 @@
           }
         }
       },
-
       "delete": {
         "operationId": "deleteEmployee",
         "tags": [
@@ -472,7 +669,6 @@
         }
       }
     },
-
     "/api/v1/projects": {
       "get": {
         "operationId": "listProjects",
@@ -517,7 +713,6 @@
           }
         }
       },
-
       "post": {
         "operationId": "createProject",
         "tags": [
@@ -589,7 +784,6 @@
         }
       }
     },
-
     "/api/v1/projects/{id}": {
       "get": {
         "operationId": "getProject",
@@ -663,7 +857,6 @@
           }
         }
       },
-
       "put": {
         "operationId": "updateProject",
         "tags": [
@@ -756,7 +949,6 @@
           }
         }
       },
-
       "delete": {
         "operationId": "deleteProject",
         "tags": [
@@ -823,7 +1015,6 @@
         }
       }
     },
-
     "/api/v1/tasks": {
       "get": {
         "operationId": "listTasks",
@@ -868,7 +1059,6 @@
           }
         }
       },
-
       "post": {
         "operationId": "createTask",
         "tags": [
@@ -940,7 +1130,6 @@
         }
       }
     },
-
     "/api/v1/tasks/{id}": {
       "get": {
         "operationId": "getTask",
@@ -1014,7 +1203,6 @@
           }
         }
       },
-
       "put": {
         "operationId": "updateTask",
         "tags": [
@@ -1107,7 +1295,6 @@
           }
         }
       },
-
       "delete": {
         "operationId": "deleteTask",
         "tags": [
@@ -1175,9 +1362,122 @@
       }
     }
   },
-
   "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
     "schemas": {
+      "RegisterRequest": {
+        "type": "object",
+        "required": [
+          "email",
+          "password"
+        ],
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "example": "ali@example.com"
+          },
+          "password": {
+            "type": "string",
+            "example": "123456"
+          }
+        }
+      },
+      "LoginRequest": {
+        "type": "object",
+        "required": [
+          "email",
+          "password"
+        ],
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "example": "ali@example.com"
+          },
+          "password": {
+            "type": "string",
+            "example": "123456"
+          }
+        }
+      },
+      "RefreshRequest": {
+        "type": "object",
+        "required": [
+          "refresh_token"
+        ],
+        "properties": {
+          "refresh_token": {
+            "type": "string",
+            "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+          }
+        }
+      },
+      "LogoutRequest": {
+        "type": "object",
+        "required": [
+          "refresh_token"
+        ],
+        "properties": {
+          "refresh_token": {
+            "type": "string",
+            "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+          }
+        }
+      },
+      "LoginResponse": {
+        "type": "object",
+        "properties": {
+          "access_token": {
+            "type": "string",
+            "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+          },
+          "refresh_token": {
+            "type": "string",
+            "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+          }
+        }
+      },
+      "CurrentUserResponse": {
+        "type": "object",
+        "properties": {
+          "user_id": {
+            "type": "integer",
+            "example": 1
+          },
+          "employee_id": {
+            "type": "integer",
+            "example": 2
+          }
+        }
+      },
+      "UserResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "example": 1
+          },
+          "employee_id": {
+            "type": "integer",
+            "example": 2
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
       "CreateEmployeeRequest": {
         "type": "object",
         "required": [
@@ -1200,7 +1500,6 @@
           }
         }
       },
-
       "UpdateEmployeeRequest": {
         "type": "object",
         "required": [
@@ -1223,7 +1522,6 @@
           }
         }
       },
-
       "EmployeeResponse": {
         "type": "object",
         "properties": {
@@ -1246,7 +1544,6 @@
           }
         }
       },
-
       "Pagination": {
         "type": "object",
         "properties": {
@@ -1273,7 +1570,6 @@
           }
         }
       },
-
       "EmployeeListResponse": {
         "type": "object",
         "required": [
@@ -1292,7 +1588,6 @@
           }
         }
       },
-
       "CreateProjectRequest": {
         "type": "object",
         "required": [
@@ -1309,7 +1604,6 @@
           }
         }
       },
-
       "UpdateProjectRequest": {
         "type": "object",
         "required": [
@@ -1326,7 +1620,6 @@
           }
         }
       },
-
       "ProjectResponse": {
         "type": "object",
         "properties": {
@@ -1344,7 +1637,6 @@
           }
         }
       },
-
       "CreateTaskRequest": {
         "type": "object",
         "required": [
@@ -1373,7 +1665,6 @@
           }
         }
       },
-
       "UpdateTaskRequest": {
         "type": "object",
         "required": [
@@ -1401,7 +1692,6 @@
           }
         }
       },
-
       "TaskResponse": {
         "type": "object",
         "properties": {
@@ -1429,7 +1719,6 @@
           }
         }
       },
-
       "ErrorResponse": {
         "type": "object",
         "required": [
@@ -1455,7 +1744,6 @@
           }
         }
       },
-
       "HealthResponse": {
         "type": "object",
         "required": [

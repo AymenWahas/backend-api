@@ -1,0 +1,135 @@
+Authorization Matrix
++++++++++++++
+	        Member     Manager    Admin        Owner
+Access Project	✅	✅	✅	✅
+Modify Project	❌	✅	✅	✅
+Delete Project	❌	❌	✅	✅
+Modify Task	❌	✅	✅	✅
+Delete Task	❌	✅	✅	✅
+Manage Members	❌	❌	✅	✅
+
+CanAccessProject()
+CanModifyProject()
+CanDeleteProject()
+CanModifyTask()
+CanDeleteTask()
+CanManageMembers()
+
+=================
+Negative Security Tests
+++==============
+manager try add member
+
+then CanManageMembers(manager, false)
+HTTP/2 403
+{
+  "error": {
+    "code": "FORBIDDEN",
+    "message": "member management denied"
+  }
+}
+=================
+Rate Limiting
+=====================
+ayman-wahas@ayman-wahas:~/backend-api$ for i in {1..25}; do   code=$(curl -k -s -o /dev/nul
+l -w "%{http_code}" \
+    -H "X-Forwarded-For: 10.10.10.10" \
+    https://localhost:8443/health);   echo "$i -> $code"; done
+1 -> 200
+2 -> 200
+3 -> 200
+4 -> 200
+5 -> 200
+6 -> 200
+7 -> 200
+8 -> 200
+9 -> 200
+10 -> 200
+11 -> 200
+12 -> 200
+13 -> 200
+14 -> 200
+15 -> 200
+16 -> 200
+17 -> 200
+18 -> 200
+19 -> 200
+20 -> 200
+21 -> 429
+22 -> 429
+
+===============
+One-page Threat Model
+========
+s — ماذا نحمي؟
+Users
+Passwords
+JWT tokens
+Projects
+Tasks
+Memberships
+Employee data
+PostgreSQL
+Redis
+
+
+Trust Boundaries
+Client
+   ↓
+HTTP API
+   ↓
+PostgreSQL
+   ↓
+Redis
+
+Threats
+مثلاً:
+1. IDOR
+2. Privilege Escalation
+3. Unauthorized Member Management
+4. Forged Role
+5. SQL Injection
+6. Request Abuse
+7. CSRF
+8. SSRF
+9. Unsafe File Handling
+
+Mitigations
+AuthorizationUsecase
+JWT identity only
+Project membership
+Owner verification
+Deny-by-default
+Parameterized queries
+Rate limiting
+Request size limit
+CORS
+Security headers
+HTTPS
+
+Residual Risks
+مثلاً:
+
+- Rate limiting is currently in-memory.
+- X-Forwarded-For must only be trusted behind a trusted proxy.
+- No current file-upload surface.
+- SSRF risk must be reviewed if outbound URL fetching is introduced.
+- New endpoints must be added to authorization tests.
+
+
+
+{"access_token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoxMiwiZW1wbG95ZWVfaWQiOjExMjAsImV4cCI6MTc4OTQ5NDM1NywiaWF0IjoxNzg5NDkzNDU3fQ.m0s8SSjrpGJC0jOkYm9Rhh3MIIuZ4-9ADfSJH5S47L0",
+
+"refresh_token":"70558e3f5425d969a35bda020e1c5e8383cc3b20f0233560815269619ff3247b"}
+
+
+{"access_token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoxMywiZW1wbG95ZWVfaWQiOjExMjEsImV4cCI6MTc4OTQ5NDgwNSwiaWF0IjoxNzg5NDkzOTA1fQ.74RiiKVH1q5RW8z5qNgfv9FaJqcchY05gFAtP-OINZ4",
+"refresh_token":"6ff08c26689017eeb3c6aaeefa54f5b7c74975003756b2659e105b93dd3582c1"}
+
+
+
+
+  }'
+{"access_token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoxNCwiZW1wbG95ZWVfaWQiOjExMjIsImV4cCI6MTc4OTQ5NzAxMiwiaWF0IjoxNzg5NDk2MTEyfQ.NF2jNqPJhC-MJv4VwtOdxIB5RdwW3xpvZSg27lL_77Y",
+
+"refresh_token":"02d85de70f1a85ae202447819c3d87f902611236ce8af8dd8ef098fb78c0ee0a"}

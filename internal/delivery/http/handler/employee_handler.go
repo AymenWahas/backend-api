@@ -16,30 +16,58 @@ import (
 )
 
 type Handler struct {
-	usecase        *usecase.EmployeeUsecase
-	projectHandler *ProjectHandler
-	taskHandler    *TaskHandler
+	usecase                  *usecase.EmployeeUsecase
+	projectHandler           *ProjectHandler
+	taskHandler              *TaskHandler
+	projectMembershipHandler *ProjectMembershipHandler
 }
 
 func NewHandler(
 	employeeUC *usecase.EmployeeUsecase,
 	projectUC *usecase.ProjectUsecase,
 	taskUC *usecase.TaskUsecase,
+	membershipUCs ...*usecase.ProjectMembershipUsecase,
 ) *Handler {
+	var membershipUC *usecase.ProjectMembershipUsecase
+
+	if len(membershipUCs) > 0 {
+		membershipUC = membershipUCs[0]
+	}
+
 	return &Handler{
-		usecase:        employeeUC,
-		projectHandler: NewProjectHandler(projectUC),
-		taskHandler:    NewTaskHandler(taskUC),
+		usecase: employeeUC,
+
+		projectHandler: NewProjectHandler(
+			projectUC,
+		),
+
+		taskHandler: NewTaskHandler(
+			taskUC,
+		),
+
+		projectMembershipHandler: NewProjectMembershipHandler(
+			membershipUC,
+		),
 	}
 }
 
-func (h *Handler) Health(w http.ResponseWriter, r *http.Request) {
-	response.WriteJSON(w, http.StatusOK, map[string]string{
-		"status": "ok",
-	})
+func (h *Handler) Health(
+	w http.ResponseWriter,
+	r *http.Request,
+) {
+	response.WriteJSON(
+		w,
+		http.StatusOK,
+		map[string]string{
+			"status": "ok",
+		},
+	)
 }
 
-func (h *Handler) CreateEmployee(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) CreateEmployee(
+	w http.ResponseWriter,
+	r *http.Request,
+) {
 	var req dto.CreateEmployeeRequest
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -62,47 +90,46 @@ func (h *Handler) CreateEmployee(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// dto to domain
 	employee := domain.Employee{
 		Name:       req.Name,
 		Email:      req.Email,
 		Department: req.Department,
 	}
 
-	// call usecase to create employee
-	created, err := h.usecase.CreateEmployee(r.Context(), employee)
-
+	created, err := h.usecase.CreateEmployee(
+		r.Context(),
+		employee,
+	)
 	if err != nil {
-		if errors.Is(err, usecase.ErrInvalidEmployee) {
+		switch {
+		case errors.Is(err, usecase.ErrInvalidEmployee):
 			response.WriteError(
 				w,
 				http.StatusBadRequest,
 				"INVALID_EMPLOYEE",
 				"employee name and email are required",
 			)
-			return
-		}
 
-		if errors.Is(err, domain.ErrEmployeeAlreadyExists) {
+		case errors.Is(err, domain.ErrEmployeeAlreadyExists):
 			response.WriteError(
 				w,
 				http.StatusConflict,
 				"EMPLOYEE_ALREADY_EXISTS",
 				"employee with this email already exists",
 			)
-			return
+
+		default:
+			response.WriteError(
+				w,
+				http.StatusInternalServerError,
+				"INTERNAL_ERROR",
+				"internal server error",
+			)
 		}
 
-		response.WriteError(
-			w,
-			http.StatusInternalServerError,
-			"INTERNAL_ERROR",
-			"internal server error",
-		)
 		return
 	}
 
-	// domain to dto
 	res := dto.EmployeeResponse{
 		ID:         created.ID,
 		Name:       created.Name,
@@ -110,10 +137,17 @@ func (h *Handler) CreateEmployee(w http.ResponseWriter, r *http.Request) {
 		Department: created.Department,
 	}
 
-	response.WriteJSON(w, http.StatusCreated, res)
+	response.WriteJSON(
+		w,
+		http.StatusCreated,
+		res,
+	)
 }
 
-func (h *Handler) GetEmployees(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) GetEmployees(
+	w http.ResponseWriter,
+	r *http.Request,
+) {
 	query := r.URL.Query()
 
 	filter := repository.EmployeeFilter{
@@ -121,7 +155,6 @@ func (h *Handler) GetEmployees(w http.ResponseWriter, r *http.Request) {
 		Email: query.Get("email"),
 	}
 
-	// sort by id, name, email
 	sortParam := query.Get("sort")
 
 	sortBy := repository.EmployeeSort{
@@ -147,7 +180,6 @@ func (h *Handler) GetEmployees(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// pagination
 	page := 1
 	pageSize := 10
 
@@ -183,7 +215,6 @@ func (h *Handler) GetEmployees(w http.ResponseWriter, r *http.Request) {
 
 	offset := (page - 1) * pageSize
 
-	// call usecase to get employees with filter, sort and pagination
 	employees, total, version, err := h.usecase.GetEmployees(
 		r.Context(),
 		filter,
@@ -201,7 +232,6 @@ func (h *Handler) GetEmployees(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// set etag header for caching
 	etag := fmt.Sprintf(
 		`"employees-%d-page-%d-size-%d-name-%s-email-%s-sort-%s-desc-%t"`,
 		version,
@@ -215,13 +245,11 @@ func (h *Handler) GetEmployees(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("ETag", etag)
 
-	// check if the etag matches the request header
 	if r.Header.Get("If-None-Match") == etag {
 		w.WriteHeader(http.StatusNotModified)
 		return
 	}
 
-	// convert domain employees to dto employees
 	data := make([]dto.EmployeeResponse, 0, len(employees))
 
 	for _, employee := range employees {
@@ -233,14 +261,12 @@ func (h *Handler) GetEmployees(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	// calculate total pages for pagination
 	totalPages := 0
 
 	if total > 0 {
 		totalPages = (total + pageSize - 1) / pageSize
 	}
 
-	// create response with data and pagination info
 	res := dto.EmployeeListResponse{
 		Data: data,
 		Pagination: dto.Pagination{
@@ -251,13 +277,18 @@ func (h *Handler) GetEmployees(w http.ResponseWriter, r *http.Request) {
 		},
 	}
 
-	response.WriteJSON(w, http.StatusOK, res)
+	response.WriteJSON(
+		w,
+		http.StatusOK,
+		res,
+	)
 }
 
-// GetEmployee handles the GET /employees/{id} endpoint.
-func (h *Handler) GetEmployee(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) GetEmployee(
+	w http.ResponseWriter,
+	r *http.Request,
+) {
 	id, err := strconv.Atoi(r.PathValue("id"))
-
 	if err != nil || id <= 0 {
 		response.WriteError(
 			w,
@@ -268,7 +299,10 @@ func (h *Handler) GetEmployee(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	employee, err := h.usecase.GetEmployee(r.Context(), id)
+	employee, err := h.usecase.GetEmployee(
+		r.Context(),
+		id,
+	)
 	if err != nil {
 		if errors.Is(err, repository.ErrEmployeeNotFound) {
 			response.WriteError(
@@ -289,12 +323,18 @@ func (h *Handler) GetEmployee(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response.WriteJSON(w, http.StatusOK, employee)
+	response.WriteJSON(
+		w,
+		http.StatusOK,
+		employee,
+	)
 }
 
-func (h *Handler) UpdateEmployee(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) UpdateEmployee(
+	w http.ResponseWriter,
+	r *http.Request,
+) {
 	id, err := strconv.Atoi(r.PathValue("id"))
-
 	if err != nil || id <= 0 {
 		response.WriteError(
 			w,
@@ -324,7 +364,10 @@ func (h *Handler) UpdateEmployee(w http.ResponseWriter, r *http.Request) {
 		Department: req.Department,
 	}
 
-	updated, err := h.usecase.UpdateEmployee(r.Context(), employee)
+	updated, err := h.usecase.UpdateEmployee(
+		r.Context(),
+		employee,
+	)
 	if err != nil {
 		switch {
 		case errors.Is(err, usecase.ErrInvalidEmployee):
@@ -370,12 +413,18 @@ func (h *Handler) UpdateEmployee(w http.ResponseWriter, r *http.Request) {
 		Department: updated.Department,
 	}
 
-	response.WriteJSON(w, http.StatusOK, res)
+	response.WriteJSON(
+		w,
+		http.StatusOK,
+		res,
+	)
 }
 
-func (h *Handler) DeleteEmployee(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) DeleteEmployee(
+	w http.ResponseWriter,
+	r *http.Request,
+) {
 	id, err := strconv.Atoi(r.PathValue("id"))
-
 	if err != nil || id <= 0 {
 		response.WriteError(
 			w,
@@ -386,7 +435,10 @@ func (h *Handler) DeleteEmployee(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = h.usecase.DeleteEmployee(r.Context(), id)
+	err = h.usecase.DeleteEmployee(
+		r.Context(),
+		id,
+	)
 	if err != nil {
 		if errors.Is(err, repository.ErrEmployeeNotFound) {
 			response.WriteError(
@@ -410,42 +462,140 @@ func (h *Handler) DeleteEmployee(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (h *Handler) CreateProject(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) CreateProject(
+	w http.ResponseWriter,
+	r *http.Request,
+) {
 	h.projectHandler.Create(w, r)
 }
 
-func (h *Handler) GetProjects(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) GetProjectMembers(
+	w http.ResponseWriter,
+	r *http.Request,
+) {
+	if h.projectMembershipHandler == nil {
+		response.WriteError(
+			w,
+			http.StatusInternalServerError,
+			"INTERNAL_ERROR",
+			"membership service unavailable",
+		)
+		return
+	}
+
+	h.projectMembershipHandler.GetMembers(w, r)
+}
+
+func (h *Handler) AddProjectMember(
+	w http.ResponseWriter,
+	r *http.Request,
+) {
+	if h.projectMembershipHandler == nil {
+		response.WriteError(
+			w,
+			http.StatusInternalServerError,
+			"INTERNAL_ERROR",
+			"membership service unavailable",
+		)
+		return
+	}
+
+	h.projectMembershipHandler.AddMember(w, r)
+}
+
+func (h *Handler) UpdateProjectMemberRole(
+	w http.ResponseWriter,
+	r *http.Request,
+) {
+	if h.projectMembershipHandler == nil {
+		response.WriteError(
+			w,
+			http.StatusInternalServerError,
+			"INTERNAL_ERROR",
+			"membership service unavailable",
+		)
+		return
+	}
+
+	h.projectMembershipHandler.UpdateRole(w, r)
+}
+
+func (h *Handler) RemoveProjectMember(
+	w http.ResponseWriter,
+	r *http.Request,
+) {
+	if h.projectMembershipHandler == nil {
+		response.WriteError(
+			w,
+			http.StatusInternalServerError,
+			"INTERNAL_ERROR",
+			"membership service unavailable",
+		)
+		return
+	}
+
+	h.projectMembershipHandler.RemoveMember(w, r)
+}
+
+func (h *Handler) GetProjects(
+	w http.ResponseWriter,
+	r *http.Request,
+) {
 	h.projectHandler.GetAll(w, r)
 }
 
-func (h *Handler) GetProject(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) GetProject(
+	w http.ResponseWriter,
+	r *http.Request,
+) {
 	h.projectHandler.GetByID(w, r)
 }
 
-func (h *Handler) UpdateProject(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) UpdateProject(
+	w http.ResponseWriter,
+	r *http.Request,
+) {
 	h.projectHandler.Update(w, r)
 }
 
-func (h *Handler) DeleteProject(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) DeleteProject(
+	w http.ResponseWriter,
+	r *http.Request,
+) {
 	h.projectHandler.Delete(w, r)
 }
 
-func (h *Handler) CreateTask(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) CreateTask(
+	w http.ResponseWriter,
+	r *http.Request,
+) {
 	h.taskHandler.Create(w, r)
 }
 
-func (h *Handler) GetTasks(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) GetTasks(
+	w http.ResponseWriter,
+	r *http.Request,
+) {
 	h.taskHandler.GetAll(w, r)
 }
 
-func (h *Handler) GetTask(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) GetTask(
+	w http.ResponseWriter,
+	r *http.Request,
+) {
 	h.taskHandler.GetByID(w, r)
 }
 
-func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) UpdateTask(
+	w http.ResponseWriter,
+	r *http.Request,
+) {
 	h.taskHandler.Update(w, r)
 }
 
-func (h *Handler) DeleteTask(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) DeleteTask(
+	w http.ResponseWriter,
+	r *http.Request,
+) {
 	h.taskHandler.Delete(w, r)
 }

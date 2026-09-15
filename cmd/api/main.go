@@ -33,28 +33,33 @@ func main() {
 	if err != nil {
 		slog.Error(
 			"configuration validation failed",
-			"error", err,
+			"error",
+			err,
 		)
 		return
 	}
 
 	// Database
+
 	db, err := database.NewPostgres(cfg)
 	if err != nil {
 		slog.Error(
 			"database connection failed",
-			"error", err,
+			"error",
+			err,
 		)
 		return
 	}
 
 	// Redis
+
 	redisClient := cache.NewRedis("localhost:6379")
 
 	if err := redisClient.Ping(context.Background()); err != nil {
 		slog.Error(
 			"redis connection failed",
-			"error", err,
+			"error",
+			err,
 		)
 		return
 	}
@@ -62,19 +67,32 @@ func main() {
 	slog.Info("redis connection successful")
 
 	// Event Publisher
+
 	eventPublisher := messaging.NewRedisStreamPublisher(
 		redisClient.Client(),
 	)
 
 	// Repositories
+
 	employeeRepo := postgres.NewEmployeeRepository(db)
 	projectRepo := postgres.NewProjectRepository(db)
 	taskRepo := postgres.NewTaskRepository(db)
 	notificationRepo := postgres.NewNotificationRepository(db)
 	userRepo := postgres.NewUserRepository(db)
 	authSessionRepo := postgres.NewAuthSessionRepository(db)
+	membershipRepo := postgres.NewMembershipRepository(db)
+
+	// Authorization
+
+	authorizationUC := usecase.NewAuthorizationUsecase(
+		userRepo,
+		projectRepo,
+		membershipRepo,
+		taskRepo,
+	)
 
 	// Usecases
+
 	employeeUC := usecase.NewEmployeeUsecase(
 		employeeRepo,
 	)
@@ -82,11 +100,13 @@ func main() {
 	projectUC := usecase.NewProjectUsecase(
 		projectRepo,
 		redisClient,
+		authorizationUC,
 	)
 
 	taskUC := usecase.NewTaskUsecase(
 		taskRepo,
 		eventPublisher,
+		authorizationUC,
 	)
 
 	authUC := usecase.NewAuthUsecase(
@@ -97,7 +117,15 @@ func main() {
 		cfg.AccessTokenTTL,
 	)
 
+	projectMembershipUC := usecase.NewProjectMembershipUsecase(
+		projectRepo,
+		membershipRepo,
+		employeeRepo,
+		authorizationUC,
+	)
+
 	// Notification Worker
+
 	notificationWorker := worker.NewNotificationWorker(
 		redisClient.Client(),
 		notificationRepo,
@@ -105,41 +133,51 @@ func main() {
 	)
 
 	go func() {
-		if err := notificationWorker.Run(context.Background()); err != nil {
+		if err := notificationWorker.Run(
+			context.Background(),
+		); err != nil {
 			slog.Error(
 				"notification worker stopped",
-				"error", err,
+				"error",
+				err,
 			)
 		}
 	}()
 
 	// HTTP Handlers
+
 	h := handler.NewHandler(
 		employeeUC,
 		projectUC,
 		taskUC,
+		projectMembershipUC,
 	)
 
 	authHandler := handler.NewAuthHandler(authUC)
 
 	// Router
+
 	router := httpRouter.NewRouter(
 		h,
 		authHandler,
 		cfg.RequestTimeout,
 		cfg.JWTSecret,
+		cfg.AllowedOrigins,
 	)
 
 	// Port
+
 	port := cfg.Port
 	addr := ":" + port
 
 	slog.Info(
 		"HTTPS server starting",
-		"addr", addr,
+		"addr",
+		addr,
 	)
 
 	// HTTPS Server
+
 	err = http.ListenAndServeTLS(
 		addr,
 		"certs/cert.pem",
@@ -150,7 +188,8 @@ func main() {
 	if err != nil {
 		slog.Error(
 			"server failed",
-			"error", err,
+			"error",
+			err,
 		)
 	}
 }

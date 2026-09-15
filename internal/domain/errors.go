@@ -11,6 +11,10 @@ var (
 	ErrUserNotFound              = errors.New("user not found")
 	ErrUserAlreadyExists         = errors.New("user already exists")
 	ErrInvalidCredentials        = errors.New("invalid credentials")
+	ErrForbidden = errors.New("forbidden")
 	ErrProjectConflict           = errors.New("project was modified by another transaction")
 	ErrNotificationAlreadyExists = errors.New("notification already exists")
+	ErrMembershipNotFound        = errors.New("membership not found")
+	ErrInvalidProjectRole        = errors.New("invalid project role")
+	
 )

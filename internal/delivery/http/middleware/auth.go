@@ -21,7 +21,7 @@ func Auth(jwtSecret string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
-			header := r.Header.Get("Authorization")
+			header := strings.TrimSpace(r.Header.Get("Authorization"))
 
 			if header == "" {
 				response.WriteError(
@@ -33,9 +33,9 @@ func Auth(jwtSecret string) func(http.Handler) http.Handler {
 				return
 			}
 
-			parts := strings.SplitN(header, " ", 2)
+			parts := strings.Fields(header)
 
-			if len(parts) != 2 || parts[0] != "Bearer" {
+			if len(parts) != 2 || !strings.EqualFold(parts[0], "Bearer") {
 				response.WriteError(
 					w,
 					http.StatusUnauthorized,
@@ -51,6 +51,7 @@ func Auth(jwtSecret string) func(http.Handler) http.Handler {
 				tokenString,
 				&auth.AccessTokenClaims{},
 				func(token *jwt.Token) (interface{}, error) {
+
 					if token.Method != jwt.SigningMethodHS256 {
 						return nil, errors.New("unexpected signing method")
 					}
@@ -70,6 +71,7 @@ func Auth(jwtSecret string) func(http.Handler) http.Handler {
 			}
 
 			claims, ok := token.Claims.(*auth.AccessTokenClaims)
+
 			if !ok {
 				response.WriteError(
 					w,
@@ -92,7 +94,10 @@ func Auth(jwtSecret string) func(http.Handler) http.Handler {
 				claims.EmployeeID,
 			)
 
-			next.ServeHTTP(w, r.WithContext(ctx))
+			next.ServeHTTP(
+				w,
+				r.WithContext(ctx),
+			)
 		})
 	}
 }

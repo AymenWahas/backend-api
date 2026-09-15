@@ -93,3 +93,43 @@ func TestAuthMiddleware_ValidToken(t *testing.T) {
 		t.Fatalf("expected status 200, got %d", rec.Code)
 	}
 }
+func TestAuthMiddleware_DoesNotTrustUserRoleHeader(t *testing.T) {
+	secret := "test-secret"
+
+	token, err := auth.GenerateAccessToken(
+		123,
+		456,
+		secret,
+		15*time.Minute,
+	)
+	if err != nil {
+		t.Fatalf("GenerateAccessToken() error = %v", err)
+	}
+
+	handler := Auth(secret)(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// The middleware must not create authorization
+			// information from a client-controlled role header.
+			if role := r.Context().Value("role"); role != nil {
+				t.Fatalf("role must not come from client header")
+			}
+
+			w.WriteHeader(http.StatusOK)
+		}),
+	)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/me", nil)
+
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	// Simulate an attacker trying to become admin.
+	req.Header.Set("X-User-Role", "admin")
+
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", rec.Code)
+	}
+}
