@@ -2,9 +2,14 @@ package main
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"net/http"
 	"os"
+	"os/signal"
+	"sync"
+	"syscall"
+	"time"
 
 	"backend-api/internal/cache"
 	"backend-api/internal/config"
@@ -12,6 +17,7 @@ import (
 	httpRouter "backend-api/internal/delivery/http"
 	"backend-api/internal/delivery/http/handler"
 	"backend-api/internal/messaging"
+	"backend-api/internal/observability"
 	"backend-api/internal/repository/postgres"
 	"backend-api/internal/usecase"
 	"backend-api/internal/worker"
@@ -28,7 +34,18 @@ func main() {
 	)
 
 	slog.SetDefault(logger)
+	observability.Register()
 
+	// Application context.
+	// It is cancelled when the process receives SIGTERM or Ctrl+C.
+	ctx, stop := signal.NotifyContext(
+		context.Background(),
+		os.Interrupt,
+		syscall.SIGTERM,
+	)
+	defer stop()
+
+	// Configuration
 	cfg, err := config.Load()
 	if err != nil {
 		slog.Error(
@@ -40,7 +57,6 @@ func main() {
 	}
 
 	// Database
-
 	db, err := database.NewPostgres(cfg)
 	if err != nil {
 		slog.Error(
@@ -51,11 +67,27 @@ func main() {
 		return
 	}
 
-	// Redis
+	observability.RecordDBStats(database.Stats(db))
+	//to update connection db
+	go func() {
+		ticker := time.NewTicker(10 * time.Second)
+		defer ticker.Stop()
 
+		for {
+			select {
+			case <-ticker.C:
+				observability.RecordDBStats(database.Stats(db))
+
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+
+	// Redis
 	redisClient := cache.NewRedis("localhost:6379")
 
-	if err := redisClient.Ping(context.Background()); err != nil {
+	if err := redisClient.Ping(ctx); err != nil {
 		slog.Error(
 			"redis connection failed",
 			"error",
@@ -67,13 +99,11 @@ func main() {
 	slog.Info("redis connection successful")
 
 	// Event Publisher
-
 	eventPublisher := messaging.NewRedisStreamPublisher(
 		redisClient.Client(),
 	)
 
 	// Repositories
-
 	employeeRepo := postgres.NewEmployeeRepository(db)
 	projectRepo := postgres.NewProjectRepository(db)
 	taskRepo := postgres.NewTaskRepository(db)
@@ -83,7 +113,6 @@ func main() {
 	membershipRepo := postgres.NewMembershipRepository(db)
 
 	// Authorization
-
 	authorizationUC := usecase.NewAuthorizationUsecase(
 		userRepo,
 		projectRepo,
@@ -92,7 +121,6 @@ func main() {
 	)
 
 	// Usecases
-
 	employeeUC := usecase.NewEmployeeUsecase(
 		employeeRepo,
 	)
@@ -125,19 +153,23 @@ func main() {
 	)
 
 	// Notification Worker
-
 	notificationWorker := worker.NewNotificationWorker(
 		redisClient.Client(),
 		notificationRepo,
 		slog.Default(),
 	)
 
+	var workerWG sync.WaitGroup
+	workerWG.Add(1)
+
 	go func() {
-		if err := notificationWorker.Run(
-			context.Background(),
-		); err != nil {
+		defer workerWG.Done()
+
+		if err := notificationWorker.Run(ctx); err != nil &&
+			!errors.Is(err, context.Canceled) {
+
 			slog.Error(
-				"notification worker stopped",
+				"notification worker stopped with error",
 				"error",
 				err,
 			)
@@ -145,7 +177,6 @@ func main() {
 	}()
 
 	// HTTP Handlers
-
 	h := handler.NewHandler(
 		employeeUC,
 		projectUC,
@@ -156,7 +187,6 @@ func main() {
 	authHandler := handler.NewAuthHandler(authUC)
 
 	// Router
-
 	router := httpRouter.NewRouter(
 		h,
 		authHandler,
@@ -165,10 +195,14 @@ func main() {
 		cfg.AllowedOrigins,
 	)
 
-	// Port
-
+	// HTTP Server
 	port := cfg.Port
 	addr := ":" + port
+
+	server := &http.Server{
+		Addr:    addr,
+		Handler: router,
+	}
 
 	slog.Info(
 		"HTTPS server starting",
@@ -176,20 +210,46 @@ func main() {
 		addr,
 	)
 
-	// HTTPS Server
+	go func() {
+		if err := server.ListenAndServeTLS(
+			"certs/cert.pem",
+			"certs/key.pem",
+		); err != nil && err != http.ErrServerClosed {
+			slog.Error(
+				"server failed",
+				"error",
+				err,
+			)
 
-	err = http.ListenAndServeTLS(
-		addr,
-		"certs/cert.pem",
-		"certs/key.pem",
-		router,
+			stop()
+		}
+	}()
+
+	// Wait for SIGTERM or Ctrl+C.
+	<-ctx.Done()
+
+	slog.Info("shutdown signal received")
+
+	// Give active HTTP requests time to finish.
+	shutdownCtx, cancel := context.WithTimeout(
+		context.Background(),
+		10*time.Second,
 	)
+	defer cancel()
 
-	if err != nil {
+	if err := server.Shutdown(shutdownCtx); err != nil {
 		slog.Error(
-			"server failed",
+			"HTTP server shutdown failed",
 			"error",
 			err,
 		)
+	} else {
+		slog.Info("HTTP server shutdown complete")
 	}
+	workerWG.Wait()
+
+	// ctx was cancelled by SIGTERM/Ctrl+C.
+	// The notification worker receives the same cancellation
+	// through ctx and should stop its processing.
+	slog.Info("application shutdown complete")
 }

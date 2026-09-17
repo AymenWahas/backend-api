@@ -1,0 +1,104 @@
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&77
+1. Race-detector result
+ماذا يثبت؟
+أن تشغيل الـ Worker والـ goroutines المتزامنة لم يكشف عن Data Race في الاختبارات.
+&&&&&&&&&&&&&&&&&&&&
+ayman-wahas@ayman-wahas:~/backend-api$ go test -race ./...
+?       backend-api/cmd/api     [no test files]
+ok      backend-api/internal/auth       4.059s
+?       backend-api/internal/cache      [no test files]
+?       backend-api/internal/config     [no test files]
+ok      backend-api/internal/database   1.567s
+?       backend-api/internal/delivery/http      [no test files]
+ok      backend-api/internal/delivery/http/dto  1.014s
+?       backend-api/internal/delivery/http/handler      [no test files]
+ok      backend-api/internal/delivery/http/middleware   1.028s
+?       backend-api/internal/delivery/http/response     [no test files]
+?       backend-api/internal/domain     [no test files]
+?       backend-api/internal/event      [no test files]
+?       backend-api/internal/messaging  [no test files]
+?       backend-api/internal/repository [no test files]
+?       backend-api/internal/repository/memory  [no test files]
+ok      backend-api/internal/repository/postgres        1.635s
+ok      backend-api/internal/security   1.017s
+ok      backend-api/internal/usecase    1.273s
+ok      backend-api/internal/worker     1.592s
+
+
+*******************
+2. Worker Cancellation Test
+أثبت أن الـ Worker يستجيب لإلغاء الـ context.
+**************************
+Command:
+
+go test ./internal/worker -run 'TestNotificationWorker(RetryAndDLQ|Cancellation)$' -v
+
+Result:
+
+=== RUN   TestNotificationWorkerRetryAndDLQ
+time=2026-09-16T17:27:47.427+03:00 level=ERROR msg="failed to process message"message_id=1789568867427-0 attempt=1 max_attempts=3 error="simulated notification repository failure"
+time=2026-09-16T17:27:47.427+03:00 level=ERROR msg="message handling failed" message_id=1789568867427-0 error="simulated notification repository failure"
+time=2026-09-16T17:27:47.498+03:00 level=ERROR msg="failed to process message"message_id=1789568867427-0 attempt=2 max_attempts=3 error="simulated notification repository failure"
+time=2026-09-16T17:27:47.498+03:00 level=ERROR msg="reclaimed message handlingfailed" message_id=1789568867427-0 error="simulated notification repository failure"
+time=2026-09-16T17:27:47.569+03:00 level=ERROR msg="failed to process message"message_id=1789568867427-0 attempt=3 max_attempts=3 error="simulated notification repository failure"
+time=2026-09-16T17:27:47.570+03:00 level=ERROR msg="message moved to DLQ" message_id=1789568867427-0 attempts=3 dlq_stream=task-events:dlq
+    notification_worker_test.go:405: retry and DLQ behavior verified successfully
+--- PASS: TestNotificationWorkerRetryAndDLQ (0.15s)
+=== RUN   TestNotificationWorkerCancellation
+time=2026-09-16T17:27:47.574+03:00 level=INFO msg="notification worker started" stream=test-cancel-task-events-1789568867571260984 group=test-cancel-notifications-1789568867571262872 consumer=test-cancel-worker
+time=2026-09-16T17:27:49.607+03:00 level=ERROR msg="failed to reclaim pending messages" error="context canceled"
+time=2026-09-16T17:27:49.607+03:00 level=INFO msg="notification worker stopped"
+    notification_worker_test.go:484: worker cancellation verified successfully
+--- PASS: TestNotificationWorkerCancellation (2.04s)
+PASS
+ok      backend-api/internal/worker     2.189s
+
+Verified:
+
+Worker started successfully.
+Application context was cancelled.
+Worker stopped after cancellation.
+Test confirmed context.Canceled.
+No timeout occurred.
+Test passed.
+
+
+
+&&&&&&&&&&&&&&&&&&&&&&&
+3. Dependency Failure 
+&&&&&&&&&&&&&&&&&&&&&&
+ayman-wahas@ayman-wahas:~/backend-api$ docker stop redis-cache
+redis-cache
+ayman-wahas@ayman-wahas:~/backend-api$ curl -k -i https://localhost:8443/health
+HTTP/2 200 
+
+{"status":"ok"}
+
+Redis
+  ❌ DOWN
+  │
+  ├── Worker → يكتشف الفشل ويسجل Error
+  │
+  └── HTTP Server → يستمر بالعمل
+                    │
+                    └── /health → HTTP 200 ✅
+
+*****************************
+4. Clean SIGTERM demonstration 
+***********************
+{"time":"2026-09-16T17:50:22.853219138+03:00","level":"INFO","msg":"shutdown signal received"}
+{"time":"2026-09-16T17:50:22.853546496+03:00","level":"INFO","msg":"HTTP server shutdown complete"}
+{"time":"2026-09-16T17:50:22.876826828+03:00","level":"INFO","msg":"notification worker stopped"}
+{"time":"2026-09-16T17:50:22.876901464+03:00","level":"INFO","msg":"application shutdown complete"}
+
+SIGTERM
+   ↓
+إيقاف استقبال طلبات جديدة
+   ↓
+HTTP Server Shutdown
+   ↓
+إيقاف Worker
+   ↓
+انتظار Worker
+   ↓
+Application shutdown complete

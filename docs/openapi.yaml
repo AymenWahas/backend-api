@@ -1,32 +1,516 @@
 openapi: 3.0.3
+
 info:
   title: Employee API
-  description: REST API for managing employees, projects, and tasks. The API uses
-    HTTPS and JSON responses with consistent error handling. Task creation may trigger
-    asynchronous notification processing through a background worker.
-  version: 1.1.0
+  description: Backend API for employees, authentication, projects, memberships, and tasks.
+  version: 1.2.0
+
 servers:
-- url: https://localhost:8443
-  description: Local HTTPS server
+  - url: https://localhost:8443
+    description: Local HTTPS server
+
 tags:
-- name: Auth
-  description: Authentication and session management
-- name: Employees
-  description: Employee management
-- name: Projects
-  description: Project management
-- name: Tasks
-  description: Task management
-- name: Health
-  description: Server health
+  - name: Health
+    description: Server health
+  - name: Authentication
+    description: Authentication and session management
+  - name: Employees
+    description: Employee management
+  - name: Projects
+    description: Project management
+  - name: Project Members
+    description: Project membership and role management
+  - name: Tasks
+    description: Task management
+
+components:
+
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+
+    EmployeeID:
+      name: id
+      in: path
+      required: true
+      description: Employee ID.
+      schema:
+        type: integer
+        minimum: 1
+      example: 1052
+
+    ProjectID:
+      name: id
+      in: path
+      required: true
+      description: Project ID.
+      schema:
+        type: integer
+        minimum: 1
+      example: 1
+
+    TaskID:
+      name: id
+      in: path
+      required: true
+      description: Task ID.
+      schema:
+        type: integer
+        minimum: 1
+      example: 1
+
+    ProjectMemberEmployeeID:
+      name: employeeId
+      in: path
+      required: true
+      description: Employee ID of the project member.
+      schema:
+        type: integer
+        minimum: 1
+      example: 1052
+
+  schemas:
+
+    Error:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: object
+          required:
+            - code
+            - message
+          properties:
+            code:
+              type: string
+              example: INVALID_JSON
+            message:
+              type: string
+              example: invalid JSON body
+
+    RegisterRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          example: user@example.com
+        password:
+          type: string
+          format: password
+          example: secret123
+
+    LoginRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          example: user@example.com
+        password:
+          type: string
+          format: password
+          example: secret123
+
+    RefreshRequest:
+      type: object
+      required:
+        - refresh_token
+      properties:
+        refresh_token:
+          type: string
+          example: eyJhbGciOiJIUzI1NiIs...
+
+    LogoutRequest:
+      type: object
+      required:
+        - refresh_token
+      properties:
+        refresh_token:
+          type: string
+          example: eyJhbGciOiJIUzI1NiIs...
+
+    LoginResponse:
+      type: object
+      required:
+        - access_token
+        - refresh_token
+      properties:
+        access_token:
+          type: string
+          example: eyJhbGciOiJIUzI1NiIs...
+        refresh_token:
+          type: string
+          example: eyJhbGciOiJIUzI1NiIs...
+
+    User:
+      type: object
+      required:
+        - id
+        - employee_id
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: integer
+          example: 1
+        employee_id:
+          type: integer
+          example: 1052
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    MeResponse:
+      type: object
+      required:
+        - user_id
+        - employee_id
+      properties:
+        user_id:
+          type: integer
+          example: 1
+        employee_id:
+          type: integer
+          example: 1052
+
+    Employee:
+      type: object
+      required:
+        - id
+        - name
+        - email
+      properties:
+        id:
+          type: integer
+          example: 1052
+        name:
+          type: string
+          example: Ayman
+        email:
+          type: string
+          format: email
+          example: ayman@example.com
+        department:
+          type: string
+          nullable: true
+          example: Engineering
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        deleted_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    CreateEmployeeRequest:
+      type: object
+      required:
+        - name
+        - email
+      properties:
+        name:
+          type: string
+          example: Ayman
+        email:
+          type: string
+          format: email
+          example: ayman@example.com
+        department:
+          type: string
+          nullable: true
+          example: Engineering
+
+    UpdateEmployeeRequest:
+      type: object
+      required:
+        - name
+        - email
+      properties:
+        name:
+          type: string
+          example: Ayman
+        email:
+          type: string
+          format: email
+          example: ayman@example.com
+        department:
+          type: string
+          nullable: true
+          example: Engineering
+
+    Pagination:
+      type: object
+      required:
+        - page
+        - page_size
+        - total
+        - total_pages
+      properties:
+        page:
+          type: integer
+          example: 1
+        page_size:
+          type: integer
+          example: 10
+        total:
+          type: integer
+          example: 25
+        total_pages:
+          type: integer
+          example: 3
+
+    EmployeeListResponse:
+      type: object
+      required:
+        - data
+        - pagination
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Employee'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+
+    CreateProjectRequest:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          example: Backend API
+        description:
+          type: string
+          example: Backend engineering project
+
+    UpdateProjectRequest:
+      type: object
+      required:
+        - name
+        - version
+      properties:
+        name:
+          type: string
+          example: Backend API
+        description:
+          type: string
+          example: Updated project description
+        version:
+          type: integer
+          minimum: 1
+          example: 2
+
+    Project:
+      type: object
+      required:
+        - id
+        - owner_id
+        - name
+        - version
+      properties:
+        id:
+          type: integer
+          example: 1
+        owner_id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: Backend API
+        description:
+          type: string
+          example: Backend engineering project
+        version:
+          type: integer
+          example: 1
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        deleted_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    CreateTaskRequest:
+      type: object
+      required:
+        - project_id
+        - title
+      properties:
+        project_id:
+          type: integer
+          minimum: 1
+          example: 1
+        title:
+          type: string
+          example: Implement authentication
+        status:
+          type: string
+          example: pending
+
+    UpdateTaskRequest:
+      type: object
+      required:
+        - project_id
+        - title
+      properties:
+        project_id:
+          type: integer
+          minimum: 1
+          example: 1
+          description: Accepted by the request DTO but the current update handler does not change the task project.
+        title:
+          type: string
+          example: Implement authorization
+        status:
+          type: string
+          example: completed
+
+    Task:
+      type: object
+      required:
+        - id
+        - project_id
+        - title
+        - status
+      properties:
+        id:
+          type: integer
+          example: 1
+        project_id:
+          type: integer
+          example: 1
+        title:
+          type: string
+          example: Implement authentication
+        status:
+          type: string
+          example: pending
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        deleted_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    AddProjectMemberRequest:
+      type: object
+      required:
+        - employee_id
+        - role
+      properties:
+        employee_id:
+          type: integer
+          minimum: 1
+          example: 1052
+        role:
+          type: string
+          enum:
+            - member
+            - manager
+            - admin
+          example: member
+
+    UpdateProjectMemberRoleRequest:
+      type: object
+      required:
+        - role
+      properties:
+        role:
+          type: string
+          enum:
+            - member
+            - manager
+            - admin
+          example: manager
+
+    Membership:
+      type: object
+      required:
+        - employee_id
+        - project_id
+        - role
+        - is_active
+      properties:
+        employee_id:
+          type: integer
+          example: 1052
+        project_id:
+          type: integer
+          example: 1
+        role:
+          type: string
+          enum:
+            - member
+            - manager
+            - admin
+          example: member
+        is_active:
+          type: boolean
+          example: true
+        created_at:
+          type: string
+          format: date-time
+
+    StatusResponse:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          example: member added
+
 paths:
+
+  /health:
+    get:
+      tags:
+        - Health
+      summary: Health check
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+
   /api/v1/auth/register:
     post:
-      operationId: registerUser
       tags:
-      - Auth
-      summary: Register user
-      description: Register a new user using employee email and password.
+        - Authentication
+      summary: Register a user
       requestBody:
         required: true
         content:
@@ -35,24 +519,23 @@ paths:
               $ref: '#/components/schemas/RegisterRequest'
       responses:
         '201':
-          description: User registered successfully.
+          description: User created
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UserResponse'
+                $ref: '#/components/schemas/User'
         '400':
-          description: Invalid request.
+          description: Invalid JSON or registration failure
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/Error'
+
   /api/v1/auth/login:
     post:
-      operationId: loginUser
       tags:
-      - Auth
-      summary: Login user
-      description: Authenticate a user and return a JWT set.
+        - Authentication
+      summary: Login
       requestBody:
         required: true
         content:
@@ -61,24 +544,29 @@ paths:
               $ref: '#/components/schemas/LoginRequest'
       responses:
         '200':
-          description: Login successful.
+          description: Login successful
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/LoginResponse'
-        '401':
-          description: Invalid credentials.
+        '400':
+          description: Invalid JSON
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
   /api/v1/auth/refresh:
     post:
-      operationId: refreshToken
       tags:
-      - Auth
-      summary: Refresh token
-      description: Refresh an access token using a valid refresh token.
+        - Authentication
+      summary: Refresh access token
       requestBody:
         required: true
         content:
@@ -87,24 +575,29 @@ paths:
               $ref: '#/components/schemas/RefreshRequest'
       responses:
         '200':
-          description: Token refreshed successfully.
+          description: Tokens refreshed
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/LoginResponse'
-        '401':
-          description: Invalid or expired refresh token.
+        '400':
+          description: Invalid JSON
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Invalid or expired refresh token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
   /api/v1/auth/logout:
     post:
-      operationId: logoutUser
       tags:
-      - Auth
-      summary: Logout user
-      description: Invalidate a refresh token.
+        - Authentication
+      summary: Logout and revoke refresh token
       requestBody:
         required: true
         content:
@@ -113,133 +606,112 @@ paths:
               $ref: '#/components/schemas/LogoutRequest'
       responses:
         '204':
-          description: Logged out successfully.
-        '401':
-          description: Invalid refresh token.
+          description: Logout successful
+        '400':
+          description: Invalid JSON
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Invalid or expired refresh token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
   /api/v1/me:
     get:
-      operationId: getCurrentUser
       tags:
-      - Auth
-      summary: Get current user info
-      description: Returns the authenticated user id and employee id.
+        - Authentication
+      summary: Get authenticated identity
       security:
-      - bearerAuth: []
+        - BearerAuth: []
       responses:
         '200':
-          description: Current user retrieved successfully.
+          description: Authenticated identity
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/CurrentUserResponse'
+                $ref: '#/components/schemas/MeResponse'
         '401':
-          description: Authentication required.
+          description: Authentication required
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
-  /health:
-    get:
-      operationId: healthCheck
-      tags:
-      - Health
-      summary: Health check
-      description: Check whether the API server is running.
-      responses:
-        '200':
-          description: Server is healthy
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/HealthResponse'
+                $ref: '#/components/schemas/Error'
+
   /api/v1/employees:
     get:
-      operationId: listEmployees
       tags:
-      - Employees
-      summary: Get employees
-      description: Get a paginated list of employees with optional filtering and sorting.
-        Use '-field' for descending order.
+        - Employees
+      summary: List employees
       parameters:
-      - name: page
-        in: query
-        required: false
-        description: Page number.
-        schema:
-          type: integer
-          minimum: 1
-          default: 1
-      - name: page_size
-        in: query
-        required: false
-        description: Number of employees per page.
-        schema:
-          type: integer
-          minimum: 1
-          maximum: 100
-          default: 10
-      - name: name
-        in: query
-        required: false
-        description: Filter employees by name.
-        schema:
-          type: string
-      - name: email
-        in: query
-        required: false
-        description: Filter employees by email.
-        schema:
-          type: string
-      - name: sort
-        in: query
-        required: false
-        description: Sort field. Prefix with '-' for descending order.
-        schema:
-          type: string
-          enum:
-          - id
-          - -id
-          - name
-          - -name
-          - email
-          - -email
-          default: id
-          example: -name
+        - name: name
+          in: query
+          schema:
+            type: string
+        - name: email
+          in: query
+          schema:
+            type: string
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum:
+              - id
+              - name
+              - email
+              - -id
+              - -name
+              - -email
+            default: id
+          description: Sort field. Prefix with '-' for descending order.
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 10
       responses:
         '200':
-          description: Employees retrieved successfully.
+          description: Employee list
+          headers:
+            ETag:
+              description: Entity tag used for conditional requests.
+              schema:
+                type: string
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/EmployeeListResponse'
+        '304':
+          description: Not modified
         '400':
-          description: Invalid parameters.
+          description: Invalid query parameter
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '406':
-          description: Not acceptable.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/Error'
         '500':
-          description: Internal server error.
+          description: Internal server error
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/Error'
+
     post:
-      operationId: createEmployee
       tags:
-      - Employees
+        - Employees
       summary: Create employee
-      description: Create a new employee.
       requestBody:
         required: true
         content:
@@ -248,95 +720,69 @@ paths:
               $ref: '#/components/schemas/CreateEmployeeRequest'
       responses:
         '201':
-          description: Employee created successfully.
+          description: Employee created
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/EmployeeResponse'
+                $ref: '#/components/schemas/Employee'
         '400':
-          description: Invalid employee data.
+          description: Invalid JSON or employee
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '406':
-          description: Not acceptable.
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Employee email already exists
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '415':
-          description: Unsupported media type.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/Error'
         '500':
-          description: Internal server error.
+          description: Internal server error
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/Error'
+
   /api/v1/employees/{id}:
     get:
-      operationId: getEmployee
       tags:
-      - Employees
+        - Employees
       summary: Get employee
-      description: Get a single employee by ID.
       parameters:
-      - name: id
-        in: path
-        required: true
-        description: Employee ID.
-        schema:
-          type: integer
-          minimum: 1
+        - $ref: '#/components/parameters/EmployeeID'
       responses:
         '200':
-          description: Employee retrieved successfully.
+          description: Employee
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/EmployeeResponse'
+                $ref: '#/components/schemas/Employee'
         '400':
-          description: Invalid employee ID.
+          description: Invalid employee ID
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/Error'
         '404':
-          description: Employee not found.
+          description: Employee not found
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '406':
-          description: Not acceptable.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/Error'
         '500':
-          description: Internal server error.
+          description: Internal server error
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/Error'
+
     put:
-      operationId: updateEmployee
       tags:
-      - Employees
+        - Employees
       summary: Update employee
-      description: Update an existing employee.
       parameters:
-      - name: id
-        in: path
-        required: true
-        description: Employee ID.
-        schema:
-          type: integer
-          minimum: 1
+        - $ref: '#/components/parameters/ProjectMemberEmployeeID'
       requestBody:
         required: true
         content:
@@ -345,116 +791,99 @@ paths:
               $ref: '#/components/schemas/UpdateEmployeeRequest'
       responses:
         '200':
-          description: Employee updated successfully.
+          description: Employee updated
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/EmployeeResponse'
+                $ref: '#/components/schemas/Employee'
         '400':
-          description: Invalid employee data.
+          description: Invalid JSON or employee
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/Error'
         '404':
-          description: Employee not found.
+          description: Employee not found
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '406':
-          description: Not acceptable.
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Employee email already exists
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '415':
-          description: Unsupported media type.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/Error'
         '500':
-          description: Internal server error.
+          description: Internal server error
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/Error'
+
     delete:
-      operationId: deleteEmployee
       tags:
-      - Employees
+        - Employees
       summary: Delete employee
-      description: Delete an employee by ID.
       parameters:
-      - name: id
-        in: path
-        required: true
-        description: Employee ID.
-        schema:
-          type: integer
-          minimum: 1
+        - $ref: '#/components/parameters/EmployeeID'
       responses:
         '204':
-          description: Employee deleted successfully.
+          description: Employee deleted
         '400':
-          description: Invalid employee ID.
+          description: Invalid employee ID
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/Error'
         '404':
-          description: Employee not found.
+          description: Employee not found
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '406':
-          description: Not acceptable.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/Error'
         '500':
-          description: Internal server error.
+          description: Internal server error
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/Error'
+
   /api/v1/projects:
     get:
-      operationId: listProjects
       tags:
-      - Projects
-      summary: Get all projects
-      description: Get a list of all projects.
+        - Projects
+      summary: List accessible projects
+      security:
+        - BearerAuth: []
       responses:
         '200':
-          description: Projects retrieved successfully.
+          description: Projects retrieved successfully
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/ProjectResponse'
-        '406':
-          description: Not acceptable.
+                  $ref: '#/components/schemas/Project'
+        '401':
+          description: Authentication required
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/Error'
         '500':
-          description: Internal server error.
+          description: Internal server error
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/Error'
+
     post:
-      operationId: createProject
       tags:
-      - Projects
+        - Projects
       summary: Create project
-      description: Create a new project.
+      security:
+        - BearerAuth: []
       requestBody:
         required: true
         content:
@@ -463,95 +892,85 @@ paths:
               $ref: '#/components/schemas/CreateProjectRequest'
       responses:
         '201':
-          description: Project created successfully.
+          description: Project created
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ProjectResponse'
+                $ref: '#/components/schemas/Project'
         '400':
-          description: Invalid project data.
+          description: Invalid JSON or project
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '406':
-          description: Not acceptable.
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Authentication required
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '415':
-          description: Unsupported media type.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/Error'
         '500':
-          description: Internal server error.
+          description: Internal server error
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/Error'
+
   /api/v1/projects/{id}:
     get:
-      operationId: getProject
       tags:
-      - Projects
+        - Projects
       summary: Get project
-      description: Get a single project by ID.
+      security:
+        - BearerAuth: []
       parameters:
-      - name: id
-        in: path
-        required: true
-        description: Project ID.
-        schema:
-          type: integer
-          minimum: 1
+        - $ref: '#/components/parameters/ProjectID'
       responses:
         '200':
-          description: Project retrieved successfully.
+          description: Project retrieved successfully
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ProjectResponse'
+                $ref: '#/components/schemas/Project'
         '400':
-          description: Invalid project ID.
+          description: Invalid project ID
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Project access denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '404':
-          description: Project not found.
+          description: Project not found
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '406':
-          description: Not acceptable.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/Error'
         '500':
-          description: Internal server error.
+          description: Internal server error
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/Error'
+
     put:
-      operationId: updateProject
       tags:
-      - Projects
+        - Projects
       summary: Update project
-      description: Update an existing project.
+      security:
+        - BearerAuth: []
       parameters:
-      - name: id
-        in: path
-        required: true
-        description: Project ID.
-        schema:
-          type: integer
-          minimum: 1
+        - $ref: '#/components/parameters/ProjectID'
       requestBody:
         required: true
         content:
@@ -560,118 +979,312 @@ paths:
               $ref: '#/components/schemas/UpdateProjectRequest'
       responses:
         '200':
-          description: Project updated successfully.
+          description: Project updated successfully
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ProjectResponse'
+                $ref: '#/components/schemas/Project'
         '400':
-          description: Invalid project data.
+          description: Invalid JSON or project
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Project update denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '404':
-          description: Project not found.
+          description: Project not found
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '406':
-          description: Not acceptable.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '415':
-          description: Unsupported media type.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/Error'
         '500':
-          description: Internal server error.
+          description: Internal server error
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/Error'
+
     delete:
-      operationId: deleteProject
       tags:
-      - Projects
+        - Projects
       summary: Delete project
-      description: Delete a project by ID.
+      security:
+        - BearerAuth: []
       parameters:
-      - name: id
-        in: path
-        required: true
-        description: Project ID.
-        schema:
-          type: integer
-          minimum: 1
+        - $ref: '#/components/parameters/ProjectID'
       responses:
         '204':
-          description: Project deleted successfully.
+          description: Project deleted
         '400':
-          description: Invalid project ID.
+          description: Invalid project ID
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Project deletion denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '404':
-          description: Project not found.
+          description: Project not found
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '406':
-          description: Not acceptable.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/Error'
         '500':
-          description: Internal server error.
+          description: Internal server error
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
-  /api/v1/tasks:
+                $ref: '#/components/schemas/Error'
+
+  /api/v1/projects/{id}/members:
     get:
-      operationId: listTasks
       tags:
-      - Tasks
-      summary: Get all tasks
-      description: Get a list of all tasks.
+        - Project Members
+      summary: Get project members
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ProjectID'
       responses:
         '200':
-          description: Tasks retrieved successfully.
+          description: Project members
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/TaskResponse'
-        '406':
-          description: Not acceptable.
+                  $ref: '#/components/schemas/Membership'
+        '400':
+          description: Invalid project ID
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Project access denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '500':
-          description: Internal server error.
+          description: Internal server error
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/Error'
+
     post:
-      operationId: createTask
       tags:
-      - Tasks
+        - Project Members
+      summary: Add project member
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ProjectID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddProjectMemberRequest'
+      responses:
+        '201':
+          description: Member added
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusResponse'
+        '400':
+          description: Invalid request or role
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Member management denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Project or employee not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/v1/projects/{id}/members/{employeeId}/role:
+    patch:
+      tags:
+        - Project Members
+      summary: Update project member role
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ProjectID'
+        - $ref: '#/components/parameters/ProjectMemberEmployeeID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateProjectMemberRoleRequest'
+      responses:
+        '200':
+          description: Role updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Member management denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Project or membership not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/v1/projects/{id}/members/{employeeId}:
+    delete:
+      tags:
+        - Project Members
+      summary: Remove project member
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ProjectID'
+        - $ref: '#/components/parameters/ProjectMemberEmployeeID'
+      responses:
+        '204':
+          description: Member removed
+        '400':
+          description: Invalid ID
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Member management denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Project or membership not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/v1/tasks:
+    get:
+      tags:
+        - Tasks
+      summary: List tasks
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Tasks retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Task'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    post:
+      tags:
+        - Tasks
       summary: Create task
-      description: Create a new task. After successful creation, a task.created event
-        may be published for asynchronous notification processing by a background
-        worker.
+      security:
+        - BearerAuth: []
       requestBody:
         required: true
         content:
@@ -680,95 +1293,91 @@ paths:
               $ref: '#/components/schemas/CreateTaskRequest'
       responses:
         '201':
-          description: Task created successfully.
+          description: Task created
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/TaskResponse'
+                $ref: '#/components/schemas/Task'
         '400':
-          description: Invalid task data.
+          description: Invalid JSON or task
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '406':
-          description: Not acceptable.
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Authentication required
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '415':
-          description: Unsupported media type.
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Task creation denied
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/Error'
         '500':
-          description: Internal server error.
+          description: Internal server error
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/Error'
+
   /api/v1/tasks/{id}:
     get:
-      operationId: getTask
       tags:
-      - Tasks
+        - Tasks
       summary: Get task
-      description: Get a single task by ID.
+      security:
+        - BearerAuth: []
       parameters:
-      - name: id
-        in: path
-        required: true
-        description: Task ID.
-        schema:
-          type: integer
-          minimum: 1
+        - $ref: '#/components/parameters/TaskID'
       responses:
         '200':
-          description: Task retrieved successfully.
+          description: Task retrieved successfully
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/TaskResponse'
+                $ref: '#/components/schemas/Task'
         '400':
-          description: Invalid task ID.
+          description: Invalid task ID
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Task access denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '404':
-          description: Task not found.
+          description: Task not found
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '406':
-          description: Not acceptable.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/Error'
         '500':
-          description: Internal server error.
+          description: Internal server error
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/Error'
+
     put:
-      operationId: updateTask
       tags:
-      - Tasks
+        - Tasks
       summary: Update task
-      description: Update an existing task.
+      security:
+        - BearerAuth: []
       parameters:
-      - name: id
-        in: path
-        required: true
-        description: Task ID.
-        schema:
-          type: integer
-          minimum: 1
+        - $ref: '#/components/parameters/TaskID'
       requestBody:
         required: true
         content:
@@ -777,361 +1386,80 @@ paths:
               $ref: '#/components/schemas/UpdateTaskRequest'
       responses:
         '200':
-          description: Task updated successfully.
+          description: Task updated successfully
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/TaskResponse'
+                $ref: '#/components/schemas/Task'
         '400':
-          description: Invalid task data.
+          description: Invalid JSON or task
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Task update denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '404':
-          description: Task not found.
+          description: Task not found
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '406':
-          description: Not acceptable.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '415':
-          description: Unsupported media type.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/Error'
         '500':
-          description: Internal server error.
+          description: Internal server error
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/Error'
+
     delete:
-      operationId: deleteTask
       tags:
-      - Tasks
+        - Tasks
       summary: Delete task
-      description: Delete a task by ID.
+      security:
+        - BearerAuth: []
       parameters:
-      - name: id
-        in: path
-        required: true
-        description: Task ID.
-        schema:
-          type: integer
-          minimum: 1
+        - $ref: '#/components/parameters/TaskID'
       responses:
         '204':
-          description: Task deleted successfully.
+          description: Task deleted
         '400':
-          description: Invalid task ID.
+          description: Invalid task ID
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Task deletion denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '404':
-          description: Task not found.
+          description: Task not found
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '406':
-          description: Not acceptable.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/Error'
         '500':
-          description: Internal server error.
+          description: Internal server error
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
-components:
-  securitySchemes:
-    bearerAuth:
-      type: http
-      scheme: bearer
-      bearerFormat: JWT
-  schemas:
-    RegisterRequest:
-      type: object
-      required:
-      - email
-      - password
-      properties:
-        email:
-          type: string
-          format: email
-          example: ali@example.com
-        password:
-          type: string
-          example: '123456'
-    LoginRequest:
-      type: object
-      required:
-      - email
-      - password
-      properties:
-        email:
-          type: string
-          format: email
-          example: ali@example.com
-        password:
-          type: string
-          example: '123456'
-    RefreshRequest:
-      type: object
-      required:
-      - refresh_token
-      properties:
-        refresh_token:
-          type: string
-          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-    LogoutRequest:
-      type: object
-      required:
-      - refresh_token
-      properties:
-        refresh_token:
-          type: string
-          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-    LoginResponse:
-      type: object
-      properties:
-        access_token:
-          type: string
-          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-        refresh_token:
-          type: string
-          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-    CurrentUserResponse:
-      type: object
-      properties:
-        user_id:
-          type: integer
-          example: 1
-        employee_id:
-          type: integer
-          example: 2
-    UserResponse:
-      type: object
-      properties:
-        id:
-          type: integer
-          example: 1
-        employee_id:
-          type: integer
-          example: 2
-        created_at:
-          type: string
-          format: date-time
-        updated_at:
-          type: string
-          format: date-time
-    CreateEmployeeRequest:
-      type: object
-      required:
-      - name
-      - email
-      properties:
-        name:
-          type: string
-          example: Ali
-        email:
-          type: string
-          format: email
-          example: ali@example.com
-        department:
-          type: string
-          example: IT
-    UpdateEmployeeRequest:
-      type: object
-      required:
-      - name
-      - email
-      properties:
-        name:
-          type: string
-          example: Ali Ahmed
-        email:
-          type: string
-          format: email
-          example: ali.ahmed@example.com
-        department:
-          type: string
-          example: HR
-    EmployeeResponse:
-      type: object
-      properties:
-        id:
-          type: integer
-          example: 1
-        name:
-          type: string
-          example: Ali
-        email:
-          type: string
-          format: email
-          example: ali@example.com
-        department:
-          type: string
-          example: IT
-    Pagination:
-      type: object
-      properties:
-        page:
-          type: integer
-          minimum: 1
-          example: 1
-        page_size:
-          type: integer
-          minimum: 1
-          maximum: 100
-          example: 10
-        total:
-          type: integer
-          minimum: 0
-          example: 3
-        total_pages:
-          type: integer
-          minimum: 0
-          example: 1
-    EmployeeListResponse:
-      type: object
-      required:
-      - data
-      - pagination
-      properties:
-        data:
-          type: array
-          items:
-            $ref: '#/components/schemas/EmployeeResponse'
-        pagination:
-          $ref: '#/components/schemas/Pagination'
-    CreateProjectRequest:
-      type: object
-      required:
-      - name
-      properties:
-        name:
-          type: string
-          example: Project Alpha
-        description:
-          type: string
-          example: This is the first project
-    UpdateProjectRequest:
-      type: object
-      required:
-      - name
-      properties:
-        name:
-          type: string
-          example: Project Alpha Updated
-        description:
-          type: string
-          example: Updated description
-    ProjectResponse:
-      type: object
-      properties:
-        id:
-          type: integer
-          example: 1
-        name:
-          type: string
-          example: Project Alpha
-        description:
-          type: string
-          example: This is the first project
-    CreateTaskRequest:
-      type: object
-      required:
-      - project_id
-      - title
-      properties:
-        project_id:
-          type: integer
-          minimum: 1
-          example: 1
-        title:
-          type: string
-          example: Design database schema
-        status:
-          type: string
-          enum:
-          - pending
-          - in_progress
-          - completed
-          example: pending
-          default: pending
-    UpdateTaskRequest:
-      type: object
-      required:
-      - project_id
-      - title
-      properties:
-        project_id:
-          type: integer
-          minimum: 1
-          example: 1
-        title:
-          type: string
-          example: Design database schema - Updated
-        status:
-          type: string
-          enum:
-          - pending
-          - in_progress
-          - completed
-          example: in_progress
-    TaskResponse:
-      type: object
-      properties:
-        id:
-          type: integer
-          example: 1
-        project_id:
-          type: integer
-          minimum: 1
-          example: 1
-        title:
-          type: string
-          example: Design database schema
-        status:
-          type: string
-          enum:
-          - pending
-          - in_progress
-          - completed
-          example: pending
-    ErrorResponse:
-      type: object
-      required:
-      - error
-      properties:
-        error:
-          type: object
-          required:
-          - code
-          - message
-          properties:
-            code:
-              type: string
-              example: EMPLOYEE_NOT_FOUND
-            message:
-              type: string
-              example: employee not found
-    HealthResponse:
-      type: object
-      required:
-      - status
-      properties:
-        status:
-          type: string
-          example: ok
+                $ref: '#/components/schemas/Error'

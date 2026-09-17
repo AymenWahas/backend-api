@@ -1,0 +1,61 @@
+//DETECT the metrics
+curl -sk https://localhost:8443/metrics | grep http_errors
+ 
+ //db metrics
+curl -sk https://localhost:8443/metrics | grep db
+***********************8
+1. Useful logs
+***************
+request completed
+method=GET
+path=/health
+status=200
+duration=...
+request_id=...
+
+***********************
+2. Latency metrics 3. Error metrics
+****************8
+http_request_duration_seconds_bucket{method="GET",path="/health",le="+Inf"} 1
+http_request_duration_seconds_sum{method="GET",path="/health"} 0.000107292
+http_request_duration_seconds_count{method="GET",path="/health"} 1
+http_requests_total{method="GET",path="/health",status="200"} 1
+
+Error metrics
+ayman-wahas@ayman-wahas:~/backend-api$ curl -sk https://localhost:8443/metrics | grep '^http_errors_total'
+http_errors_total{method="GET",path="/api/v1/projects/84/members"} 1
+http_errors_total{method="POST",path="/api/v1/projects/84/members"} 1
+
+http_errors_total
+redis_errors_total
+worker_errors_total
+worker_dlq_total
+
+
+
+
+@@@@@@@@@@@@@@@@@@
+4. Architecture explanation
+##############@@@@@@@@@
+             Load Balancer
+                  |
+       +----------+----------+
+       |          |          |
+      API1       API2       API3
+       |          |          |
+       +----------+----------+
+                  |
+          +-------+-------+
+          |               |
+      PostgreSQL         Redis
+                          |
+                    Redis Streams
+                          |
+                 +--------+--------+
+                 |        |        |
+                W1       W2       W3
+
+              Prometheus
+                   |
+                Grafana
+

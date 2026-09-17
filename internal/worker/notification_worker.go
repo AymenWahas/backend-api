@@ -12,32 +12,30 @@ import (
 
 	"backend-api/internal/domain"
 	"backend-api/internal/event"
+	"backend-api/internal/observability"
 	"backend-api/internal/repository"
 )
 
 const (
 	TaskEventsStream    = "task-events"
 	TaskEventsDLQStream = "task-events:dlq"
-
-	ConsumerGroup = "notifications"
-	ConsumerName  = "notification-worker-1"
-
-	MaxAttempts = 3
-	ClaimIdle   = 10 * time.Second
-
-	RetryKeyPrefix = "task-events:retry:"
+	ConsumerGroup       = "notifications"
+	ConsumerName        = "notification-worker-1"
+	MaxAttempts         = 3
+	ClaimIdle           = 10 * time.Second
+	MessageTimeout      = 5 * time.Second
+	RetryKeyPrefix      = "task-events:retry:"
 )
 
 type NotificationWorker struct {
 	redis            *redis.Client
 	notificationRepo repository.NotificationRepository
 	logger           *slog.Logger
-
-	stream      string
-	group       string
-	consumer    string
-	maxAttempts int
-	claimIdle   time.Duration
+	stream           string
+	group            string
+	consumer         string
+	maxAttempts      int
+	claimIdle        time.Duration
 }
 
 func NewNotificationWorker(
@@ -49,12 +47,11 @@ func NewNotificationWorker(
 		redis:            redisClient,
 		notificationRepo: notificationRepo,
 		logger:           logger,
-
-		stream:      TaskEventsStream,
-		group:       ConsumerGroup,
-		consumer:    ConsumerName,
-		maxAttempts: MaxAttempts,
-		claimIdle:   ClaimIdle,
+		stream:           TaskEventsStream,
+		group:            ConsumerGroup,
+		consumer:         ConsumerName,
+		maxAttempts:      MaxAttempts,
+		claimIdle:        ClaimIdle,
 	}
 }
 
@@ -119,7 +116,6 @@ func (w *NotificationWorker) processMessage(
 	message redis.XMessage,
 ) error {
 	rawEvent, ok := message.Values["event"].(string)
-
 	if !ok {
 		return fmt.Errorf(
 			"event field missing in message %s",
@@ -181,7 +177,6 @@ func (w *NotificationWorker) sendToDLQ(
 	attempts int64,
 ) error {
 	rawEvent, ok := message.Values["event"].(string)
-
 	if !ok {
 		return fmt.Errorf(
 			"event field missing for DLQ message %s",
@@ -189,10 +184,12 @@ func (w *NotificationWorker) sendToDLQ(
 		)
 	}
 
+	dlqStream := w.stream + ":dlq"
+
 	_, err := w.redis.XAdd(
 		ctx,
 		&redis.XAddArgs{
-			Stream: w.stream + ":dlq",
+			Stream: dlqStream,
 			ID:     "*",
 			Values: map[string]interface{}{
 				"event":               rawEvent,
@@ -216,8 +213,22 @@ func (w *NotificationWorker) handleMessage(
 	ctx context.Context,
 	message redis.XMessage,
 ) error {
-	err := w.processMessage(
+	start := time.Now()
+
+	defer func() {
+		observability.WorkerProcessingDuration.Observe(
+			time.Since(start).Seconds(),
+		)
+	}()
+
+	messageCtx, cancel := context.WithTimeout(
 		ctx,
+		MessageTimeout,
+	)
+	defer cancel()
+
+	err := w.processMessage(
+		messageCtx,
 		message,
 	)
 
@@ -228,6 +239,8 @@ func (w *NotificationWorker) handleMessage(
 			w.group,
 			message.ID,
 		).Err(); err != nil {
+			observability.WorkerErrors.Inc()
+
 			return fmt.Errorf(
 				"failed to ACK message %s: %w",
 				message.ID,
@@ -254,8 +267,12 @@ func (w *NotificationWorker) handleMessage(
 			message.ID,
 		)
 
+		observability.WorkerEventsProcessed.Inc()
+
 		return nil
 	}
+
+	observability.WorkerErrors.Inc()
 
 	attempts, attemptsErr := w.incrementAttempts(
 		ctx,
@@ -283,15 +300,18 @@ func (w *NotificationWorker) handleMessage(
 	)
 
 	if attempts < int64(w.maxAttempts) {
+		observability.WorkerRetries.Inc()
+
 		// Do NOT ACK.
-		//
 		// The message remains pending in Redis.
 		// XAUTOCLAIM will reclaim it later.
+
 		return err
 	}
 
 	// Maximum attempts reached.
 	// Move the message to the DLQ first.
+
 	if err := w.sendToDLQ(
 		ctx,
 		message,
@@ -301,7 +321,10 @@ func (w *NotificationWorker) handleMessage(
 		return err
 	}
 
+	observability.WorkerDLQ.Inc()
+
 	// DLQ succeeded, so ACK the original message.
+
 	if err := w.redis.XAck(
 		ctx,
 		w.stream,
@@ -335,7 +358,7 @@ func (w *NotificationWorker) handleMessage(
 		"attempts",
 		attempts,
 		"dlq_stream",
-		TaskEventsDLQStream,
+		w.stream+":dlq",
 	)
 
 	return nil
@@ -389,6 +412,7 @@ func (w *NotificationWorker) processNewMessages(
 
 	return nil
 }
+
 func (w *NotificationWorker) reclaimPendingMessages(
 	ctx context.Context,
 ) error {
@@ -448,9 +472,8 @@ func (w *NotificationWorker) reclaimPendingMessages(
 		}
 	}
 }
-func (w *NotificationWorker) Run(
-	ctx context.Context,
-) error {
+
+func (w *NotificationWorker) Run(ctx context.Context) error {
 	if err := w.EnsureConsumerGroup(ctx); err != nil {
 		return err
 	}
@@ -476,11 +499,17 @@ func (w *NotificationWorker) Run(
 			w.logger.Info(
 				"notification worker stopped",
 			)
-
 			return ctx.Err()
 
 		case <-ticker.C:
 			if err := w.reclaimPendingMessages(ctx); err != nil {
+				if errors.Is(err, context.Canceled) {
+					w.logger.Info(
+						"notification worker stopped",
+					)
+					return ctx.Err()
+				}
+
 				w.logger.Error(
 					"failed to reclaim pending messages",
 					"error",
@@ -491,6 +520,9 @@ func (w *NotificationWorker) Run(
 		default:
 			if err := w.processNewMessages(ctx); err != nil {
 				if errors.Is(err, context.Canceled) {
+					w.logger.Info(
+						"notification worker stopped",
+					)
 					return ctx.Err()
 				}
 
@@ -499,6 +531,15 @@ func (w *NotificationWorker) Run(
 					"error",
 					err,
 				)
+
+				select {
+				case <-time.After(500 * time.Millisecond):
+				case <-ctx.Done():
+					w.logger.Info(
+						"notification worker stopped",
+					)
+					return ctx.Err()
+				}
 			}
 		}
 	}

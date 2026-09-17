@@ -4,6 +4,8 @@ import (
 	"log/slog"
 	"net/http"
 	"time"
+
+	"backend-api/internal/observability"
 )
 
 type statusRecorder struct {
@@ -35,6 +37,13 @@ func RequestLogger(next http.Handler) http.Handler {
 		next.ServeHTTP(recorder, r)
 
 		duration := time.Since(start)
+
+		observability.RecordHTTP(
+			r.Method,
+			r.URL.Path,
+			recorder.status,
+			duration,
+		)
 
 		slog.Info(
 			"request completed",

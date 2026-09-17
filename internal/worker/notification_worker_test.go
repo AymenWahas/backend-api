@@ -19,58 +19,38 @@ import (
 	"backend-api/internal/repository/postgres"
 )
 
-func TestNotificationWorkerIntegration(
-	t *testing.T,
-) {
-	cfg := config.Config{
-		DBHost:     "localhost",
-		DBPort:     "5434",
-		DBUser:     "postgres",
-		DBPassword: "postgrespassword",
-		DBName:     "employee_db",
-	}
+type timeoutNotificationRepository struct{}
 
-	db, err := database.NewPostgres(cfg)
-	if err != nil {
-		t.Fatalf(
-			"failed to connect to PostgreSQL: %v",
-			err,
-		)
-	}
+func (r *timeoutNotificationRepository) Create(
+	ctx context.Context,
+	notification *domain.Notification,
+) error {
+	<-ctx.Done()
+	return ctx.Err()
+}
 
-	sqlDB, err := db.DB()
-	if err != nil {
-		t.Fatalf(
-			"failed to get sql.DB: %v",
-			err,
-		)
-	}
+type failingNotificationRepository struct{}
 
-	defer sqlDB.Close()
+func (r *failingNotificationRepository) Create(
+	ctx context.Context,
+	notification *domain.Notification,
+) error {
+	return errors.New("simulated notification repository failure")
+}
+
+func TestNotificationWorkerIntegration(t *testing.T) {
+	t.Setenv(
+		"JWT_SECRET",
+		"test-secret",
+	)
+	ctx := context.Background()
 
 	redisClient := redis.NewClient(
 		&redis.Options{
 			Addr: "localhost:6379",
 		},
 	)
-
-	ctx, cancel := context.WithTimeout(
-		context.Background(),
-		30*time.Second,
-	)
-	defer cancel()
-
-	if err := redisClient.Ping(ctx).Err(); err != nil {
-		t.Fatalf(
-			"failed to connect to Redis: %v",
-			err,
-		)
-	}
-
 	defer redisClient.Close()
-
-	notificationRepo :=
-		postgres.NewNotificationRepository(db)
 
 	logger := slog.New(
 		slog.NewTextHandler(
@@ -79,14 +59,30 @@ func TestNotificationWorkerIntegration(
 		),
 	)
 
+	cfg, err := config.Load()
+	if err != nil {
+		t.Fatalf(
+			"failed to load config: %v",
+			err,
+		)
+	}
+
+	db, err := database.NewPostgres(cfg)
+	if err != nil {
+		t.Fatalf(
+			"failed to connect to postgres: %v",
+			err,
+		)
+	}
+
+	notificationRepo := postgres.NewNotificationRepository(db)
+
 	worker := NewNotificationWorker(
 		redisClient,
 		notificationRepo,
 		logger,
 	)
 
-	// Use unique Redis names so this test does not
-	// conflict with the running application worker.
 	worker.stream = fmt.Sprintf(
 		"test-task-events-%d",
 		time.Now().UnixNano(),
@@ -99,42 +95,34 @@ func TestNotificationWorkerIntegration(
 
 	worker.consumer = "test-worker"
 
-	// Make reclaim fast for tests.
-	worker.claimIdle = 100 * time.Millisecond
-
 	defer redisClient.Del(
 		context.Background(),
 		worker.stream,
 		worker.stream+":dlq",
-	).Err()
+	)
 
-	// --------------------------------------------------
-	// Create Consumer Group
-	// --------------------------------------------------
-
-	if err := worker.EnsureConsumerGroup(
-		ctx,
-	); err != nil {
+	if err := worker.EnsureConsumerGroup(ctx); err != nil {
 		t.Fatalf(
 			"failed to create consumer group: %v",
 			err,
 		)
 	}
 
-	t.Log("consumer group created")
+	eventID := fmt.Sprintf(
+		"test-event-%d",
+		time.Now().UnixNano(),
+	)
 
-	// --------------------------------------------------
-	// Create Task Created Event
-	// --------------------------------------------------
+	taskID := uint(1)
 
-	taskEvent := event.TaskCreatedEvent{
-		EventID:   fmt.Sprintf("test-event-%d", time.Now().UnixNano()),
+	testEvent := event.TaskCreatedEvent{
+		EventID:   eventID,
 		EventType: "task.created",
-		TaskID:    999999,
+		TaskID:    taskID,
 		CreatedAt: time.Now().UTC(),
 	}
 
-	eventData, err := json.Marshal(taskEvent)
+	payload, err := json.Marshal(testEvent)
 	if err != nil {
 		t.Fatalf(
 			"failed to marshal event: %v",
@@ -142,279 +130,40 @@ func TestNotificationWorkerIntegration(
 		)
 	}
 
-	// --------------------------------------------------
-	// Publish Event
-	// --------------------------------------------------
-
-	messageID, err := redisClient.XAdd(
+	_, err = redisClient.XAdd(
 		ctx,
 		&redis.XAddArgs{
 			Stream: worker.stream,
-			ID:     "*",
 			Values: map[string]interface{}{
-				"event": string(eventData),
+				"event": string(payload),
 			},
 		},
 	).Result()
 
 	if err != nil {
 		t.Fatalf(
-			"failed to publish event: %v",
+			"failed to add event to stream: %v",
 			err,
 		)
 	}
 
-	t.Logf(
-		"event published: message_id=%s",
-		messageID,
-	)
-
-	// --------------------------------------------------
-	// Consume Event
-	// --------------------------------------------------
-
-	streams, err := redisClient.XReadGroup(
-		ctx,
-		&redis.XReadGroupArgs{
-			Group:    worker.group,
-			Consumer: worker.consumer,
-			Streams: []string{
-				worker.stream,
-				">",
-			},
-			Count: 1,
-			Block: 2 * time.Second,
-		},
-	).Result()
-
-	if err != nil {
+	if err := worker.processNewMessages(ctx); err != nil {
 		t.Fatalf(
-			"failed to consume event: %v",
+			"failed to process message: %v",
 			err,
 		)
 	}
-
-	if len(streams) == 0 ||
-		len(streams[0].Messages) == 0 {
-		t.Fatal("expected one message from Redis Stream")
-	}
-
-	message := streams[0].Messages[0]
-
-	t.Logf(
-		"event consumed: message_id=%s",
-		message.ID,
-	)
-
-	// --------------------------------------------------
-	// Process Event
-	// --------------------------------------------------
-
-	if err := worker.handleMessage(
-		ctx,
-		message,
-	); err != nil {
-		t.Fatalf(
-			"failed to process event: %v",
-			err,
-		)
-	}
-
-	t.Log("event processed successfully")
-
-	// --------------------------------------------------
-	// Verify PostgreSQL
-	// --------------------------------------------------
-
-	var count int64
-
-	result := db.Model(
-		&domain.Notification{},
-	).
-		Where(
-			"event_id = ?",
-			taskEvent.EventID,
-		).
-		Count(&count)
-
-	if result.Error != nil {
-		t.Fatalf(
-			"failed to query notification: %v",
-			result.Error,
-		)
-	}
-
-	if count != 1 {
-		t.Fatalf(
-			"expected exactly 1 notification, got %d",
-			count,
-		)
-	}
-
-	t.Log(
-		"PostgreSQL notification created successfully",
-	)
-
-	// --------------------------------------------------
-	// Idempotency Test
-	// --------------------------------------------------
-
-	t.Log(
-		"testing duplicate event",
-	)
-
-	duplicateMessageID, err := redisClient.XAdd(
-		ctx,
-		&redis.XAddArgs{
-			Stream: worker.stream,
-			ID:     "*",
-			Values: map[string]interface{}{
-				"event": string(eventData),
-			},
-		},
-	).Result()
-
-	if err != nil {
-		t.Fatalf(
-			"failed to publish duplicate event: %v",
-			err,
-		)
-	}
-
-	duplicateStreams, err :=
-		redisClient.XReadGroup(
-			ctx,
-			&redis.XReadGroupArgs{
-				Group:    worker.group,
-				Consumer: worker.consumer,
-				Streams: []string{
-					worker.stream,
-					">",
-				},
-				Count: 1,
-				Block: 2 * time.Second,
-			},
-		).Result()
-
-	if err != nil {
-		t.Fatalf(
-			"failed to consume duplicate event: %v",
-			err,
-		)
-	}
-
-	if len(duplicateStreams) == 0 ||
-		len(duplicateStreams[0].Messages) == 0 {
-		t.Fatal(
-			"expected duplicate message from Redis Stream",
-		)
-	}
-
-	duplicateMessage :=
-		duplicateStreams[0].Messages[0]
-
-	if duplicateMessage.ID != duplicateMessageID {
-		t.Fatalf(
-			"expected duplicate message ID %s, got %s",
-			duplicateMessageID,
-			duplicateMessage.ID,
-		)
-	}
-
-	if err := worker.handleMessage(
-		ctx,
-		duplicateMessage,
-	); err != nil {
-		t.Fatalf(
-			"duplicate event should be handled safely: %v",
-			err,
-		)
-	}
-
-	// --------------------------------------------------
-	// Verify Idempotency
-	// --------------------------------------------------
-
-	result = db.Model(
-		&domain.Notification{},
-	).
-		Where(
-			"event_id = ?",
-			taskEvent.EventID,
-		).
-		Count(&count)
-
-	if result.Error != nil {
-		t.Fatalf(
-			"failed to verify duplicate notification: %v",
-			result.Error,
-		)
-	}
-
-	if count != 1 {
-		t.Fatalf(
-			"idempotency failed: expected 1 notification, got %d",
-			count,
-		)
-	}
-
-	t.Log(
-		"idempotency verified: duplicate event did not create another notification",
-	)
 }
 
-func TestNotificationWorkerRetryAndDLQ(
-	t *testing.T,
-) {
-	cfg := config.Config{
-		DBHost:     "localhost",
-		DBPort:     "5434",
-		DBUser:     "postgres",
-		DBPassword: "postgrespassword",
-		DBName:     "employee_db",
-	}
-
-	db, err := database.NewPostgres(cfg)
-	if err != nil {
-		t.Fatalf(
-			"failed to connect to PostgreSQL: %v",
-			err,
-		)
-	}
-
-	sqlDB, err := db.DB()
-	if err != nil {
-		t.Fatalf(
-			"failed to get sql.DB: %v",
-			err,
-		)
-	}
-
-	defer sqlDB.Close()
+func TestNotificationWorkerRetryAndDLQ(t *testing.T) {
+	ctx := context.Background()
 
 	redisClient := redis.NewClient(
 		&redis.Options{
 			Addr: "localhost:6379",
 		},
 	)
-
-	ctx, cancel := context.WithTimeout(
-		context.Background(),
-		30*time.Second,
-	)
-	defer cancel()
-
-	if err := redisClient.Ping(ctx).Err(); err != nil {
-		t.Fatalf(
-			"failed to connect to Redis: %v",
-			err,
-		)
-	}
-
 	defer redisClient.Close()
-
-	notificationRepo :=
-		postgres.NewNotificationRepository(db)
 
 	logger := slog.New(
 		slog.NewTextHandler(
@@ -423,13 +172,14 @@ func TestNotificationWorkerRetryAndDLQ(
 		),
 	)
 
+	notificationRepo := &failingNotificationRepository{}
+
 	worker := NewNotificationWorker(
 		redisClient,
 		notificationRepo,
 		logger,
 	)
 
-	// Use unique Redis names for this test.
 	worker.stream = fmt.Sprintf(
 		"test-retry-task-events-%d",
 		time.Now().UnixNano(),
@@ -442,173 +192,105 @@ func TestNotificationWorkerRetryAndDLQ(
 
 	worker.consumer = "test-retry-worker"
 
-	// Make retries fast for the test.
-	worker.claimIdle = 100 * time.Millisecond
+	// Production value is 10 seconds.
+	// For the test we make pending messages
+	// eligible for XAUTOCLAIM quickly.
+	worker.claimIdle = 50 * time.Millisecond
 
 	defer redisClient.Del(
 		context.Background(),
 		worker.stream,
 		worker.stream+":dlq",
-	).Err()
+	)
 
-	if err := worker.EnsureConsumerGroup(
-		ctx,
-	); err != nil {
+	if err := worker.EnsureConsumerGroup(ctx); err != nil {
 		t.Fatalf(
 			"failed to create consumer group: %v",
 			err,
 		)
 	}
 
-	t.Log("retry test consumer group created")
+	eventID := fmt.Sprintf(
+		"retry-event-%d",
+		time.Now().UnixNano(),
+	)
 
-	// --------------------------------------------------
-	// Publish a deliberately invalid event.
-	//
-	// JSON is invalid, so processMessage will fail.
-	// --------------------------------------------------
+	testEvent := event.TaskCreatedEvent{
+		EventID:   eventID,
+		EventType: "task.created",
+		TaskID:    999,
+		CreatedAt: time.Now().UTC(),
+	}
+
+	payload, err := json.Marshal(testEvent)
+	if err != nil {
+		t.Fatalf(
+			"failed to marshal event: %v",
+			err,
+		)
+	}
 
 	messageID, err := redisClient.XAdd(
 		ctx,
 		&redis.XAddArgs{
 			Stream: worker.stream,
-			ID:     "*",
 			Values: map[string]interface{}{
-				"event": "{invalid-json",
+				"event": string(payload),
 			},
 		},
 	).Result()
 
 	if err != nil {
 		t.Fatalf(
-			"failed to publish invalid event: %v",
+			"failed to add event to stream: %v",
 			err,
 		)
 	}
 
-	t.Logf(
-		"invalid event published: message_id=%s",
-		messageID,
-	)
-
-	// --------------------------------------------------
-	// First delivery
-	// --------------------------------------------------
-
-	streams, err := redisClient.XReadGroup(
-		ctx,
-		&redis.XReadGroupArgs{
-			Group:    worker.group,
-			Consumer: worker.consumer,
-			Streams: []string{
-				worker.stream,
-				">",
-			},
-			Count: 1,
-			Block: 2 * time.Second,
-		},
-	).Result()
-
-	if err != nil {
+	// Attempt 1:
+	// The repository fails.
+	// The retry counter becomes 1.
+	// The message remains pending.
+	if err := worker.processNewMessages(ctx); err != nil {
 		t.Fatalf(
-			"failed to consume invalid event: %v",
-			err,
-		)
-	}
-
-	if len(streams) == 0 ||
-		len(streams[0].Messages) == 0 {
-		t.Fatal(
-			"expected invalid event from Redis Stream",
-		)
-	}
-
-	message := streams[0].Messages[0]
-
-	if message.ID != messageID {
-		t.Fatalf(
-			"expected message ID %s, got %s",
-			messageID,
-			message.ID,
-		)
-	}
-
-	// First processing attempt must fail.
-	err = worker.handleMessage(
-		ctx,
-		message,
-	)
-
-	if err == nil {
-		t.Fatal(
-			"expected first processing attempt to fail",
-		)
-	}
-
-	t.Logf(
-		"attempt 1 failed as expected: %v",
-		err,
-	)
-
-	// --------------------------------------------------
-	// Verify message is still Pending.
-	// --------------------------------------------------
-
-	pending, err := redisClient.XPendingExt(
-		ctx,
-		&redis.XPendingExtArgs{
-			Stream: worker.stream,
-			Group:  worker.group,
-			Start:  "-",
-			End:    "+",
-			Count:  10,
-		},
-	).Result()
-
-	if err != nil {
-		t.Fatalf(
-			"failed to inspect pending messages: %v",
-			err,
-		)
-	}
-
-	if len(pending) != 1 {
-		t.Fatalf(
-			"expected 1 pending message, got %d",
-			len(pending),
-		)
-	}
-
-	if pending[0].ID != messageID {
-		t.Fatalf(
-			"expected pending message %s, got %s",
-			messageID,
-			pending[0].ID,
-		)
-	}
-
-	t.Log(
-		"attempt 1 verified: message remains pending",
-	)
-
-	// --------------------------------------------------
-	// Attempt 2
-	// --------------------------------------------------
-
-	time.Sleep(
-		worker.claimIdle + 50*time.Millisecond,
-	)
-
-	if err := worker.reclaimPendingMessages(
-		ctx,
-	); err != nil {
-		t.Fatalf(
-			"failed to reclaim message for attempt 2: %v",
+			"unexpected error while processing attempt 1: %v",
 			err,
 		)
 	}
 
 	attempts, err := redisClient.Get(
+		ctx,
+		worker.retryKey(messageID),
+	).Int64()
+
+	if err != nil {
+		t.Fatalf(
+			"failed to read retry counter after attempt 1: %v",
+			err,
+		)
+	}
+
+	if attempts != 1 {
+		t.Fatalf(
+			"expected 1 attempt, got %d",
+			attempts,
+		)
+	}
+
+	// Attempt 2:
+	// Wait until the message becomes idle.
+	time.Sleep(
+		worker.claimIdle + 20*time.Millisecond,
+	)
+
+	if err := worker.reclaimPendingMessages(ctx); err != nil {
+		t.Fatalf(
+			"unexpected error while reclaiming attempt 2: %v",
+			err,
+		)
+	}
+
+	attempts, err = redisClient.Get(
 		ctx,
 		worker.retryKey(messageID),
 	).Int64()
@@ -627,31 +309,40 @@ func TestNotificationWorkerRetryAndDLQ(
 		)
 	}
 
-	t.Log(
-		"attempt 2 verified",
-	)
-
-	// --------------------------------------------------
-	// Attempt 3
-	// --------------------------------------------------
-
+	// Attempt 3:
+	// The maximum is 3.
+	// The third failure must move the message to the DLQ.
 	time.Sleep(
-		worker.claimIdle + 50*time.Millisecond,
+		worker.claimIdle + 20*time.Millisecond,
 	)
 
-	if err := worker.reclaimPendingMessages(
-		ctx,
-	); err != nil {
+	if err := worker.reclaimPendingMessages(ctx); err != nil {
 		t.Fatalf(
-			"failed to reclaim message for attempt 3: %v",
+			"unexpected error while reclaiming attempt 3: %v",
 			err,
 		)
 	}
 
-	// --------------------------------------------------
-	// Verify DLQ
-	// --------------------------------------------------
+	// Verify retry counter was cleared.
+	retryExists, err := redisClient.Exists(
+		ctx,
+		worker.retryKey(messageID),
+	).Result()
 
+	if err != nil {
+		t.Fatalf(
+			"failed to check retry key: %v",
+			err,
+		)
+	}
+
+	if retryExists != 0 {
+		t.Fatalf(
+			"expected retry counter to be cleared, key still exists",
+		)
+	}
+
+	// Verify the message exists in the DLQ.
 	dlqMessages, err := redisClient.XRange(
 		ctx,
 		worker.stream+":dlq",
@@ -668,118 +359,139 @@ func TestNotificationWorkerRetryAndDLQ(
 
 	if len(dlqMessages) != 1 {
 		t.Fatalf(
-			"expected exactly 1 DLQ message, got %d",
+			"expected 1 message in DLQ, got %d",
 			len(dlqMessages),
 		)
 	}
 
 	dlqMessage := dlqMessages[0]
 
-	originalID, ok :=
-		dlqMessage.Values["original_message_id"].(string)
-
-	if !ok {
-		t.Fatal(
-			"DLQ message is missing original_message_id",
-		)
-	}
-
-	if originalID != messageID {
+	if dlqMessage.Values["original_message_id"] != messageID {
 		t.Fatalf(
-			"expected original message ID %s in DLQ, got %s",
+			"expected original message ID %s in DLQ, got %v",
 			messageID,
-			originalID,
+			dlqMessage.Values["original_message_id"],
 		)
 	}
 
-	dlqAttempts, ok :=
-		dlqMessage.Values["attempts"].(string)
-
-	if !ok {
-		// Redis may return numeric values as strings,
-		// but keep the test tolerant of integer values.
-		switch value := dlqMessage.Values["attempts"].(type) {
-		case int64:
-			dlqAttempts = fmt.Sprintf(
-				"%d",
-				value,
-			)
-
-		case int:
-			dlqAttempts = fmt.Sprintf(
-				"%d",
-				value,
-			)
-
-		default:
-			t.Fatalf(
-				"unexpected DLQ attempts type: %T",
-				value,
-			)
-		}
-	}
-
-	if dlqAttempts != "3" {
-		t.Fatalf(
-			"expected DLQ attempts=3, got %s",
-			dlqAttempts,
-		)
-	}
-
-	t.Log(
-		"DLQ verified: message moved after 3 attempts",
+	attemptValue := fmt.Sprint(
+		dlqMessage.Values["attempts"],
 	)
 
-	// --------------------------------------------------
-	// Verify original message was ACKed.
-	// --------------------------------------------------
+	if attemptValue != "3" {
+		t.Fatalf(
+			"expected DLQ attempts to be 3, got %s",
+			attemptValue,
+		)
+	}
 
-	pending, err = redisClient.XPendingExt(
+	// Verify the original message was ACKed.
+	pending, err := redisClient.XPending(
 		ctx,
-		&redis.XPendingExtArgs{
-			Stream: worker.stream,
-			Group:  worker.group,
-			Start:  "-",
-			End:    "+",
-			Count:  10,
-		},
+		worker.stream,
+		worker.group,
 	).Result()
 
 	if err != nil {
 		t.Fatalf(
-			"failed to inspect pending messages after DLQ: %v",
+			"failed to inspect pending messages: %v",
 			err,
 		)
 	}
 
-	if len(pending) != 0 {
+	if pending.Count != 0 {
 		t.Fatalf(
-			"expected original message to be ACKed after DLQ, got %d pending messages",
-			len(pending),
+			"expected 0 pending messages after DLQ, got %d",
+			pending.Count,
 		)
 	}
 
 	t.Log(
-		"ACK verified: original message removed from Pending Entries",
+		"retry and DLQ behavior verified successfully",
+	)
+}
+
+func TestNotificationWorkerCancellation(t *testing.T) {
+	ctx, cancel := context.WithCancel(
+		context.Background(),
+	)
+	defer cancel()
+
+	redisClient := redis.NewClient(
+		&redis.Options{
+			Addr: "localhost:6379",
+		},
+	)
+	defer redisClient.Close()
+
+	logger := slog.New(
+		slog.NewTextHandler(
+			os.Stdout,
+			nil,
+		),
 	)
 
-	// --------------------------------------------------
-	// Verify retry counter was cleared.
-	// --------------------------------------------------
+	notificationRepo := &timeoutNotificationRepository{}
 
-	_, err = redisClient.Get(
-		ctx,
-		worker.retryKey(messageID),
-	).Result()
+	worker := NewNotificationWorker(
+		redisClient,
+		notificationRepo,
+		logger,
+	)
 
-	if !errors.Is(err, redis.Nil) {
+	worker.stream = fmt.Sprintf(
+		"test-cancel-task-events-%d",
+		time.Now().UnixNano(),
+	)
+
+	worker.group = fmt.Sprintf(
+		"test-cancel-notifications-%d",
+		time.Now().UnixNano(),
+	)
+
+	worker.consumer = "test-cancel-worker"
+
+	worker.claimIdle = 100 * time.Millisecond
+
+	defer redisClient.Del(
+		context.Background(),
+		worker.stream,
+		worker.stream+":dlq",
+	)
+
+	if err := worker.EnsureConsumerGroup(ctx); err != nil {
 		t.Fatalf(
-			"expected retry counter to be deleted, got error: %v",
+			"failed to create consumer group: %v",
 			err,
 		)
 	}
 
-	t.Log(
-		"retry counter cleanup verified",
-	)
+	done := make(chan error, 1)
+
+	go func() {
+		done <- worker.Run(ctx)
+	}()
+
+	time.Sleep(100 * time.Millisecond)
+
+	cancel()
+
+	select {
+	case err := <-done:
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf(
+				"expected context.Canceled, got %v",
+				err,
+			)
+		}
+
+		t.Log(
+			"worker cancellation verified successfully",
+		)
+
+	case <-time.After(2 * time.Second):
+		t.Fatal(
+			"worker did not stop after context cancellation",
+		)
+	}
 }

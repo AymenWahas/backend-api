@@ -1,0 +1,99 @@
+
+
+
+
+2. Threat model \\what can the hacker do //how can owr system stop hem
+
+نضع ملفاً يوضح:
+
+Asset	Threat	                       Control	Evidence
+JWT	Expired/invalid token	JWT validation	 401 test
+Projects	Unauthorized access	          Authorization      403 test
+API	Request flooding	          Rate limiting      429 test
+PostgreSQLSlow query	Context timeout	 timeout test
+Database	Concurrent update	          Optimistic locking	 version test
+Redis	Dependency failure	          Fallback	           Day 10 evidence
+Logs	Sensitive data leakage	Sanitized logging	 log inspection
+
+
+
+3. Test evidence
+
+هنا لا نقول فقط "لدينا security".
+
+نضع النتائج الفعلية التي حصلنا عليها.
+
+لدينا حالياً:
+
+Forbidden access
+
+HTTP/2 403
+
+{"error":{"code":"FORBIDDEN","message":"project access denied"}}
+
+Expired credentials
+
+TestAuthMiddleware_ExpiredToken
+PASS
+
+Rate limiting
+200
+200
+200
+200
+429
+429
+429
+429
+429
+200 × 20
+429 × 5
+\\
+PostgreSQL timeout
+
+timeout: context deadline exceeded
+PASS
+\\
+Row lock
+
+transaction 2 waited for project
+PASS
+
+Optimistic concurrency
+
+TX1 update succeeded: version 1 → 2
+TX2 update rejected: stale version detected
+PASS
+
+Transaction rollback
+
+rollback verified
+PASS
+
+
+
+
+4. Telemetry screenshots / exports
+
+لدينا:
+
+X-Request-ID  يعني معرّف فريد للطلب HTTP.
+        ↓
+structured log
+        ↓
+status = 401
+        ↓
+http_errors_total
+
+metrics  error التي استخرجناها:
+
+http_errors_total{method="GET",path="/api/v1/projects/84"} 3
+http_errors_total{method="POST",path="/api/v1/auth/login"} 3
+
+
+log Request ID:
+
+status: 401
+request_id: 95e95e8b-86b1-4166-b9e6-4ddee507680e
+
+هذا يسمى telemetry evidence.

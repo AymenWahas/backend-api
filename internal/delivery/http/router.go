@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	swaggerui "github.com/swaggest/swgui/v5"
 
 	"backend-api/internal/delivery/http/handler"
@@ -206,6 +207,10 @@ func NewRouter(
 	// Main router
 	mux := http.NewServeMux()
 
+	mux.Handle(
+		"/metrics",
+		promhttp.Handler(),
+	)
 	// API
 	mux.Handle(
 		"/",

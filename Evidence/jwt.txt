@@ -1,0 +1,22 @@
+ayman-wahas@ayman-wahas:~/backend-api$ curl -sk -X POST https://localhost:8443/api/v1/auth/login \ 
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "aymenwahas@gmail.com",
+    "password": "77575575"
+  }'
+{"access_token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoxNSwiZW1wbG95ZWVfaWQiOjExMjksImV4cCI6MTc4OTY0Nzg3NywiaWF0IjoxNzg5NjQ2OTc3fQ.MEiLu3uO4EbeHdu3TyrKmEKGBK9JD0A3fcXfi56p9Q8
+
+"refresh_token":"f332b4cb68a9523b72b3842d4a726e98c338989758f9445be9f9468c775dd1b7"
+
+
+  new
+  
+ayman-wahas@ayman-wahas:~/backend-api$ curl -sk -X POST https://localhost:8443/api/v1/auth/login \ 
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "aymenwahas@gmail.com",
+    "password": "77575575"
+  }'
+{"access_token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoxNSwiZW1wbG95ZWVfaWQiOjExMjksImV4cCI6MTc4OTY0ODQyMCwiaWF0IjoxNzg5NjQ3NTIwfQ.dRPs2wuvfysJh3j1_J8YzAWyeDlLQ1bOgAg-LH_KjNs
+
+"refresh_token":"2a14bd0c60fbfa381003856a9b6fbd027fc911c2c251b5b6f83ce5ff212d1cad"}

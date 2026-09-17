@@ -9,6 +9,11 @@ git push -u origin day9-messaging
 git tag v0.10.0
 git push origin v0.10.0
 
+git switch -c day12-authorization
+git branch --show-current
+git status
+git commit -m "implement day12 authorization and security"
+git push -u origin day12-authorization
 
 BEGIN
 

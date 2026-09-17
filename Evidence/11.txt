@@ -56,7 +56,6 @@ export ACCESS_TOKEN_TTL="15m"
 export JWT_SECRET="my-development-secret-2026"
 export ACCESS_TOKEN_TTL="15m"
 
-
 ##################
 Sanitized Logs
 #########################

@@ -133,3 +133,33 @@ func TestAuthMiddleware_DoesNotTrustUserRoleHeader(t *testing.T) {
 		t.Fatalf("expected status 200, got %d", rec.Code)
 	}
 }
+func TestAuthMiddleware_ExpiredToken(t *testing.T) {
+	secret := "test-secret"
+
+	token, err := auth.GenerateAccessToken(
+		123,
+		456,
+		secret,
+		-1*time.Minute,
+	)
+	if err != nil {
+		t.Fatalf("GenerateAccessToken() error = %v", err)
+	}
+
+	handler := Auth(secret)(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			t.Fatal("next handler should not be called")
+		}),
+	)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/me", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("expected status 401, got %d", rec.Code)
+	}
+}
