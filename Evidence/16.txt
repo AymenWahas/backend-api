@@ -1,0 +1,66 @@
+$$$$$$$$$$$$$$$$
+1-small non-root image 
+$$$$$$$$$$$$$$
+
+ayman-wahas@ayman-wahas:~/backend-api$ docker images backend-api:day16
+                                                                           i Info →   U  In Use
+IMAGE               ID             DISK USAGE   CONTENT SIZE   EXTRA
+backend-api:day16   5230269c6e0e       66.8MB         21.3MB    
+
+ayman-wahas@ayman-wahas:~/backend-api$ docker run --rm backend-api:day16 id
+uid=1000(appuser) gid=1000(appuser) groups=1000(appuser)
+
+ayman-wahas@ayman-wahas:~/backend-api$ docker images                                                                         i Info →   U  In Use
+IMAGE                             ID             DISK USAGE   CONTENT SIZE   EXTRA
+alpine:latest                     28bd5fe8b56d         13MB         3.93MB        
+backend-api:day16                 5230269c6e0e       66.8MB         21.3MB        
+cockroachdb/cockroach:v23.1.10    86066f1566a3        704MB          154MB        
+ghcr.io/zitadel/zitadel:latest    4b68a2106f60        233MB         52.8MB    U    
+
+
+&&&&&&&&&&&&&&&&&&&&&&&&&&7
+2-compose health checks
+$$$$$$$$$$$44$$$$$$$$$$$$$$$$
+ayman-wahas@ayman-wahas:~/backend-api$ docker compose ps
+NAME                     IMAGE            COMMAND                  SERVICE    CREATED          STATUS                    PORTS
+backend-api-postgres-1   postgres:15      "docker-entrypoint.s…"   postgres   54 minutes ago   Up 54 minutes (healthy)   5432/tcp
+backend-api-redis-1      redis:7-alpine   "docker-entrypoint.s…"   redis      54 minutes ago   Up 54 minutes (healthy)   6379/tcp
+
+.....................
+^^^^^^^^^^^^^^^^^^^^^
+3-persisted data // dont remove data when down
+^^^^^^^^^^^^^^^^^^^^^
+ayman-wahas@ayman-wahas:~/backend-api$ docker compose down
+[+] Running 4/4
+ ✔ Container backend-api-api-1       Removed                                                1.6s 
+ ✔ Container backend-api-postgres-1  Removed                                                0.4s 
+ ✔ Container backend-api-redis-1     Removed                                                0.3s 
+ ✔ Network backend-api_default       Removed                                                0.1s 
+ayman-wahas@ayman-wahas:~/backend-api$ docker compose up -d
+[+] Running 4/4
+ ✔ Network backend-api_default       Created                                                0.1s 
+ ✔ Container backend-api-redis-1     Healthy                                                6.4s 
+ ✔ Container backend-api-postgres-1  Healthy                                                6.4s 
+ ✔ Container backend-api-api-1       Started 
+ayman-wahas@ayman-wahas:~/backend-api$ docker compose exec postgres psql -U postgres -d employee_db -c "SELECT * FROM persistence_test;"
+ id |      message      
+----+-------------------
+  1 | day16-persistence
+(1 row)
+
+$$$$$$$$$$$$$$$$$$$$$$$$$
+4-clean startup /shutdown
+$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+ayman-wahas@ayman-wahas:~/backend-api$ docker compose logs -f api
+api-1  | {"time":"2026-09-19T18:18:42.889283682Z","level":"INFO","msg":"redis connection successful"}
+api-1  | {"time":"2026-09-19T18:18:42.890346813Z","level":"INFO","msg":"notification worker started",
+"stream":"task-events","group":"notifications","consumer":"notification-worker-1","workers":3,"batch_size":10}
+api-1  | {"time":"2026-09-19T18:18:42.890862379Z","level":"INFO","msg":"HTTPS server starting","addr":":8443"}
+
+api-1  | {"time":"2026-09-19T19:03:29.763889616Z","level":"INFO","msg":"shutdown signal received"}
+api-1  | {"time":"2026-09-19T19:03:29.764262784Z","level":"INFO","msg":"HTTP server shutdown complete"}
+api-1  | {"time":"2026-09-19T19:03:31.598586192Z","level":"INFO","msg":"notification worker stopped"}
+api-1  | {"time":"2026-09-19T19:03:31.598653905Z","level":"INFO","msg":"application shutdown complete"}
+api-1 exited with code 0
+
+

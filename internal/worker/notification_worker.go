@@ -6,6 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math/rand"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -19,23 +22,47 @@ import (
 const (
 	TaskEventsStream    = "task-events"
 	TaskEventsDLQStream = "task-events:dlq"
-	ConsumerGroup       = "notifications"
-	ConsumerName        = "notification-worker-1"
-	MaxAttempts         = 3
-	ClaimIdle           = 10 * time.Second
-	MessageTimeout      = 5 * time.Second
-	RetryKeyPrefix      = "task-events:retry:"
+
+	ConsumerGroup = "notifications"
+	ConsumerName  = "notification-worker-1"
+
+	MaxAttempts = 3
+
+	// XAUTOCLAIM will recover messages that were
+	// pending for at least this amount of time.
+	ClaimIdle = 10 * time.Second
+
+	MessageTimeout = 5 * time.Second
+	RetryKeyPrefix = "task-events:retry:" //number of retry
+
+	// Number of concurrent workers processing one batch.
+	WorkerCount = 3
+
+	// Maximum number of messages read from Redis at once.
+	BatchSize = 10
+
+	// Retry backoff configuration.
+	InitialBackoff = 1 * time.Second
+	MaxBackoff     = 30 * time.Second
 )
 
 type NotificationWorker struct {
 	redis            *redis.Client
 	notificationRepo repository.NotificationRepository
 	logger           *slog.Logger
-	stream           string
-	group            string
-	consumer         string
-	maxAttempts      int
-	claimIdle        time.Duration
+
+	stream   string
+	group    string
+	consumer string
+
+	maxAttempts int
+	claimIdle   time.Duration
+
+	workerCount int
+	batchSize   int
+
+	initialBackoff time.Duration
+	maxBackoff     time.Duration
 }
 
 func NewNotificationWorker(
@@ -47,14 +74,26 @@ func NewNotificationWorker(
 		redis:            redisClient,
 		notificationRepo: notificationRepo,
 		logger:           logger,
-		stream:           TaskEventsStream,
-		group:            ConsumerGroup,
-		consumer:         ConsumerName,
-		maxAttempts:      MaxAttempts,
-		claimIdle:        ClaimIdle,
+
+		stream:   TaskEventsStream,
+		group:    ConsumerGroup,
+		consumer: ConsumerName,
+
+		maxAttempts: MaxAttempts,
+		claimIdle:   ClaimIdle,
+
+		workerCount: WorkerCount,
+		batchSize:   BatchSize,
+
+		initialBackoff: InitialBackoff,
+		maxBackoff:     MaxBackoff,
 	}
 }
 
+// EnsureConsumerGroup creates the Redis Stream consumer group.
+//
+// BUSYGROUP means the group already exists,
+// which is not an error for our application.
 func (w *NotificationWorker) EnsureConsumerGroup(
 	ctx context.Context,
 ) error {
@@ -62,13 +101,12 @@ func (w *NotificationWorker) EnsureConsumerGroup(
 		ctx,
 		w.stream,
 		w.group,
-		"$",
+		"$", // grop of new message start
 	).Err()
-
-	if err != nil &&
-		err.Error() != "BUSYGROUP Consumer Group name already exists" {
+	//if group mojodh
+	if err != nil && !strings.Contains(err.Error(), "BUSYGROUP") {
 		return fmt.Errorf(
-			"failed to create consumer group: %w",
+			"create consumer group: %w",
 			err,
 		)
 	}
@@ -76,31 +114,29 @@ func (w *NotificationWorker) EnsureConsumerGroup(
 	return nil
 }
 
+// retryKey returns the Redis key used to store
+// the number of attempts for one message.
 func (w *NotificationWorker) retryKey(
 	messageID string,
 ) string {
 	return RetryKeyPrefix + messageID
 }
 
+// incrementAttempts increases the retry counter.
+//
+// Redis INCR returns int64. ++number
 func (w *NotificationWorker) incrementAttempts(
 	ctx context.Context,
 	messageID string,
 ) (int64, error) {
-	attempts, err := w.redis.Incr(
+	return w.redis.Incr(
 		ctx,
 		w.retryKey(messageID),
 	).Result()
-
-	if err != nil {
-		return 0, fmt.Errorf(
-			"failed to increment retry attempts: %w",
-			err,
-		)
-	}
-
-	return attempts, nil
 }
 
+// clearAttempts removes the retry counter after
+// successful processing or after sending to DLQ.
 func (w *NotificationWorker) clearAttempts(
 	ctx context.Context,
 	messageID string,
@@ -111,6 +147,94 @@ func (w *NotificationWorker) clearAttempts(
 	).Err()
 }
 
+// exponentialBackoff calculates:
+//
+// attempt 1 -> 1s
+// attempt 2 -> 2s
+// attempt 3 -> 4s
+// attempt 4 -> 8s
+//
+// The value is capped at MaxBackoff.
+func (w *NotificationWorker) exponentialBackoff(
+	attempt int64,
+) time.Duration {
+	if attempt <= 0 {
+		return w.initialBackoff
+	}
+
+	delay := w.initialBackoff
+
+	for i := int64(1); i < attempt; i++ {
+		if delay >= w.maxBackoff/2 {
+			return w.maxBackoff
+		}
+
+		delay *= 2
+	}
+
+	if delay > w.maxBackoff {
+		return w.maxBackoff
+	}
+
+	return delay
+}
+
+// backoffWithJitter adds +/-20% randomness.
+//
+// Example:
+//
+// 1s -> around 800ms-1200ms
+// 2s -> around 1600ms-2400ms
+func (w *NotificationWorker) backoffWithJitter(
+	attempt int64,
+) time.Duration {
+	base := w.exponentialBackoff(attempt)
+
+	// Random value between -0.2 and +0.2.
+	jitter := (rand.Float64() * 0.4) - 0.2
+
+	delay := float64(base) * (1 + jitter)
+
+	if delay < 0 {
+		delay = 0
+	}
+
+	return time.Duration(delay)
+}
+
+// waitBeforeRetry waits for the calculated backoff.
+//
+// The timer is context-aware, so shutdown/cancellation
+// can interrupt it.
+func (w *NotificationWorker) waitBeforeRetry(
+	ctx context.Context,
+	attempt int64,
+) error {
+	delay := w.backoffWithJitter(attempt)
+
+	w.logger.Info(
+		"waiting before retry",
+		"attempt", attempt,
+		"backoff", delay,
+	)
+
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+
+	case <-timer.C:
+		return nil
+	}
+}
+
+// processMessage converts the Redis Stream event
+// into a domain notification and stores it.
+//
+// EventID is unique in the database,
+// which gives us idempotency.
 func (w *NotificationWorker) processMessage(
 	ctx context.Context,
 	message redis.XMessage,
@@ -118,7 +242,7 @@ func (w *NotificationWorker) processMessage(
 	rawEvent, ok := message.Values["event"].(string)
 	if !ok {
 		return fmt.Errorf(
-			"event field missing in message %s",
+			"event field missing from message %s",
 			message.ID,
 		)
 	}
@@ -130,12 +254,13 @@ func (w *NotificationWorker) processMessage(
 		&taskEvent,
 	); err != nil {
 		return fmt.Errorf(
-			"failed to decode task.created event: %w",
+			"decode task event %s: %w",
+			message.ID,
 			err,
 		)
 	}
 
-	notification := &domain.Notification{
+	notification := domain.Notification{
 		EventID: taskEvent.EventID,
 		TaskID:  taskEvent.TaskID,
 		Message: fmt.Sprintf(
@@ -144,64 +269,28 @@ func (w *NotificationWorker) processMessage(
 		),
 	}
 
-	if err := w.notificationRepo.Create(
+	err := w.notificationRepo.Create(
 		ctx,
-		notification,
-	); err != nil {
+		&notification,
+	)
+	if err != nil {
+		// The same event may be delivered more than once.
+		// Because EventID is unique, duplicates are safely ignored.
 		if errors.Is(
 			err,
 			domain.ErrNotificationAlreadyExists,
 		) {
 			w.logger.Info(
-				"duplicate notification skipped",
-				"event_id",
-				taskEvent.EventID,
-				"task_id",
-				taskEvent.TaskID,
-				"message_id",
-				message.ID,
+				"duplicate notification ignored",
+				"event_id", taskEvent.EventID,
+				"message_id", message.ID,
 			)
 
 			return nil
 		}
 
-		return err
-	}
-
-	return nil
-}
-
-func (w *NotificationWorker) sendToDLQ(
-	ctx context.Context,
-	message redis.XMessage,
-	attempts int64,
-) error {
-	rawEvent, ok := message.Values["event"].(string)
-	if !ok {
 		return fmt.Errorf(
-			"event field missing for DLQ message %s",
-			message.ID,
-		)
-	}
-
-	dlqStream := w.stream + ":dlq"
-
-	_, err := w.redis.XAdd(
-		ctx,
-		&redis.XAddArgs{
-			Stream: dlqStream,
-			ID:     "*",
-			Values: map[string]interface{}{
-				"event":               rawEvent,
-				"original_message_id": message.ID,
-				"attempts":            attempts,
-			},
-		},
-	).Result()
-
-	if err != nil {
-		return fmt.Errorf(
-			"failed to publish message to DLQ: %w",
+			"create notification: %w",
 			err,
 		)
 	}
@@ -209,7 +298,17 @@ func (w *NotificationWorker) sendToDLQ(
 	return nil
 }
 
-func (w *NotificationWorker) handleMessage(
+// handleMessage processes exactly one Redis Stream message.
+//
+// Flow:
+//
+// 1. Create a timeout.
+// 2. Process the event.
+// 3. ACK on success.
+// 4. On failure, increment attempts.
+// 5. Retry if attempts < MaxAttempts.
+// 6. Send to DLQ after MaxAttempts.
+func (w *NotificationWorker) handleMessage(//إدارة محاولة واحدة + ACK/Retry/DLQ
 	ctx context.Context,
 	message redis.XMessage,
 ) error {
@@ -233,39 +332,29 @@ func (w *NotificationWorker) handleMessage(
 	)
 
 	if err == nil {
-		if err := w.redis.XAck(
+		if ackErr := w.redis.XAck(
 			ctx,
 			w.stream,
 			w.group,
 			message.ID,
-		).Err(); err != nil {
-			observability.WorkerErrors.Inc()
-
+		).Err(); ackErr != nil {
 			return fmt.Errorf(
-				"failed to ACK message %s: %w",
+				"ack message %s: %w",
 				message.ID,
-				err,
+				ackErr,
 			)
 		}
 
-		if err := w.clearAttempts(
+		if clearErr := w.clearAttempts(
 			ctx,
 			message.ID,
-		); err != nil {
+		); clearErr != nil {
 			w.logger.Warn(
 				"failed to clear retry counter",
-				"message_id",
-				message.ID,
-				"error",
-				err,
+				"message_id", message.ID,
+				"error", clearErr,
 			)
 		}
-
-		w.logger.Info(
-			"notification event processed",
-			"message_id",
-			message.ID,
-		)
 
 		observability.WorkerEventsProcessed.Inc()
 
@@ -281,211 +370,287 @@ func (w *NotificationWorker) handleMessage(
 
 	if attemptsErr != nil {
 		return fmt.Errorf(
-			"processing failed: %w; retry tracking failed: %v",
-			err,
+			"increment attempts for %s: %w",
+			message.ID,
 			attemptsErr,
 		)
 	}
 
-	w.logger.Error(
-		"failed to process message",
-		"message_id",
-		message.ID,
-		"attempt",
-		attempts,
-		"max_attempts",
-		w.maxAttempts,
-		"error",
-		err,
+	w.logger.Warn(
+		"worker message failed",
+		"message_id", message.ID,
+		"attempts", attempts,
+		"error", err,
 	)
 
+	// Retry while we still have attempts available.
+	//
+	// We intentionally DO NOT ACK the message.
+	// Redis keeps it pending so XAUTOCLAIM can recover it.
 	if attempts < int64(w.maxAttempts) {
 		observability.WorkerRetries.Inc()
-
-		// Do NOT ACK.
-		// The message remains pending in Redis.
-		// XAUTOCLAIM will reclaim it later.
 
 		return err
 	}
 
 	// Maximum attempts reached.
-	// Move the message to the DLQ first.
-
-	if err := w.sendToDLQ(
+	//
+	// Move the message to the DLQ.
+	if dlqErr := w.sendToDLQ(
 		ctx,
 		message,
 		attempts,
-	); err != nil {
-		// Do NOT ACK if DLQ publishing failed.
-		return err
+	); dlqErr != nil {
+		return fmt.Errorf(
+			"send message %s to DLQ: %w",
+			message.ID,
+			dlqErr,
+		)
 	}
 
-	observability.WorkerDLQ.Inc()
-
-	// DLQ succeeded, so ACK the original message.
-
-	if err := w.redis.XAck(
+	// ACK the original message only after
+	// successfully copying it to the DLQ.
+	if ackErr := w.redis.XAck(
 		ctx,
 		w.stream,
 		w.group,
 		message.ID,
-	).Err(); err != nil {
+	).Err(); ackErr != nil {
 		return fmt.Errorf(
-			"failed to ACK DLQ message %s: %w",
+			"ack failed message %s: %w",
 			message.ID,
-			err,
+			ackErr,
 		)
 	}
 
-	if err := w.clearAttempts(
+	if clearErr := w.clearAttempts(
 		ctx,
 		message.ID,
-	); err != nil {
+	); clearErr != nil {
 		w.logger.Warn(
-			"failed to clear DLQ retry counter",
-			"message_id",
-			message.ID,
-			"error",
-			err,
+			"failed to clear retry counter after DLQ",
+			"message_id", message.ID,
+			"error", clearErr,
 		)
 	}
 
-	w.logger.Error(
-		"message moved to DLQ",
-		"message_id",
-		message.ID,
-		"attempts",
-		attempts,
-		"dlq_stream",
-		w.stream+":dlq",
-	)
+	observability.WorkerDLQ.Inc()
 
 	return nil
 }
 
-func (w *NotificationWorker) processNewMessages(
+// sendToDLQ copies the failed message
+// to the dead-letter stream.
+
+func (w *NotificationWorker) sendToDLQ(// = حفظ الرسالة التي فشلت نهائيًا
+	ctx context.Context,
+	message redis.XMessage,
+	attempts int64,
+) error {
+	payload, err := json.Marshal(
+		map[string]any{
+			"event":    message.Values["event"],
+			"attempts": attempts,
+		},
+	)
+	if err != nil {
+		return fmt.Errorf(
+			"marshal DLQ payload: %w",
+			err,
+		)
+	}
+
+	return w.redis.XAdd(
+		ctx,
+		&redis.XAddArgs{
+			Stream: w.stream + ":dlq",
+			Values: map[string]interface{}{
+				"original_message_id": message.ID,
+				"attempts":            attempts,
+				"event":               string(payload),
+			},
+		},
+	).Err()
+}
+
+// processBatch processes a bounded number
+// of messages concurrently.
+//
+// Example:
+//
+
+// WorkerCount = 3
+//
+// At most 3 goroutines process messages concurrently.
+func (w *NotificationWorker) processBatch( // BatchSize   = for msg 10 توزيع العمل على goroutines
+	ctx context.Context,
+	messages []redis.XMessage,
+) error {
+	if len(messages) == 0 {
+		return nil
+	}
+
+	jobs := make(chan redis.XMessage)
+
+	var wg sync.WaitGroup
+
+	workerCount := w.workerCount
+
+	if workerCount > len(messages) {
+		workerCount = len(messages)
+	}
+
+	// Start bounded workers.
+	for i := 0; i < workerCount; i++ {
+		wg.Add(1)
+
+		go func(workerID int) {
+			defer wg.Done()
+
+			for {
+				select {
+				case <-ctx.Done():
+					return
+
+				case message, ok := <-jobs:
+					if !ok {
+						return
+					}
+
+					if err := w.handleMessage(
+						ctx,
+						message,
+					); err != nil {
+						// A message-level failure is not a
+						// batch-level failure.
+						//
+						// The message remains pending and
+						// can be recovered by XAUTOCLAIM.
+						w.logger.Warn(
+							"message processing failed; message remains pending",
+							"worker_id", workerID,
+							"message_id", message.ID,
+							"error", err,
+						)
+					}
+				}
+			}
+		}(i + 1)
+	}
+
+	// Feed jobs to workers.
+sendLoop:
+	for _, message := range messages {
+		select {
+		case <-ctx.Done():
+			break sendLoop
+
+		case jobs <- message:
+		}
+	}
+
+	close(jobs)
+
+	wg.Wait()
+
+	return nil
+}
+
+// processNewMessages reads new messages
+// from the Redis Stream.
+func (w *NotificationWorker) processNewMessages(//= جلب الرسائل الجديدة
 	ctx context.Context,
 ) error {
-	streams, err := w.redis.XReadGroup(
+	result, err := w.redis.XReadGroup(
 		ctx,
 		&redis.XReadGroupArgs{
 			Group:    w.group,
 			Consumer: w.consumer,
-			Streams:  []string{w.stream, ">"},
-			Count:    10,
-			Block:    2 * time.Second,
+			Streams: []string{
+				w.stream,
+				">", // give me new msg that givent consumer yet
+			},
+			Count: int64(w.batchSize),
+			Block: 2 * time.Second,
 		},
 	).Result()
 
 	if err != nil {
+		// if dont have msg
 		if errors.Is(err, redis.Nil) {
 			return nil
 		}
 
-		if errors.Is(err, context.Canceled) {
-			return ctx.Err()
-		}
-
 		return fmt.Errorf(
-			"failed to read task events: %w",
+			"read new messages: %w",
 			err,
 		)
 	}
 
-	for _, stream := range streams {
-		for _, message := range stream.Messages {
-			if err := w.handleMessage(
-				ctx,
-				message,
-			); err != nil {
-				w.logger.Error(
-					"message handling failed",
-					"message_id",
-					message.ID,
-					"error",
-					err,
-				)
-			}
+	for _, stream := range result {
+		if err := w.processBatch(
+			ctx,
+			stream.Messages,
+		); err != nil {
+			return err
 		}
 	}
 
 	return nil
 }
 
-func (w *NotificationWorker) reclaimPendingMessages(
+// reclaimPendingMessages recovers messages
+// that were delivered but never ack.
+func (w *NotificationWorker) reclaimPendingMessages( //= استعادة الرسائل العالقة
 	ctx context.Context,
 ) error {
-	startID := "0-0"
+	messages, _, err := w.redis.XAutoClaim(
+		ctx,
+		&redis.XAutoClaimArgs{
+			Stream:   w.stream,
+			Group:    w.group,
+			Consumer: w.consumer,
+			MinIdle:  w.claimIdle, //get pending msg after 10 seconds
+			Start:    "0-0",       //  redis start search msg frm old point in stream
+			Count:    int64(w.batchSize),
+		},
+	).Result()
 
-	for {
-		messages, nextID, err := w.redis.XAutoClaim(
-			ctx,
-			&redis.XAutoClaimArgs{
-				Stream:   w.stream,
-				Group:    w.group,
-				Consumer: w.consumer,
-				MinIdle:  w.claimIdle,
-				Start:    startID,
-				Count:    10,
-			},
-		).Result()
-
-		if err != nil {
-			if errors.Is(err, redis.Nil) {
-				return nil
-			}
-
-			if errors.Is(err, context.Canceled) {
-				return ctx.Err()
-			}
-
-			return fmt.Errorf(
-				"failed to auto-claim pending messages: %w",
-				err,
-			)
-		}
-
-		if len(messages) == 0 {
-			return nil
-		}
-
-		for _, message := range messages {
-			if err := w.handleMessage(
-				ctx,
-				message,
-			); err != nil {
-				w.logger.Error(
-					"reclaimed message handling failed",
-					"message_id",
-					message.ID,
-					"error",
-					err,
-				)
-			}
-		}
-
-		startID = nextID
-
-		if startID == "0-0" {
-			return nil
-		}
+	if err != nil {
+		return fmt.Errorf(
+			"auto claim pending messages: %w",
+			err,
+		)
 	}
+
+	return w.processBatch(
+		ctx,
+		messages,
+	)
 }
 
-func (w *NotificationWorker) Run(ctx context.Context) error {
+// Run starts the notification worker.
+//
+// The worker:
+//
+// 1. Ensures the consumer group exists.
+// 2. Reclaims abandoned messages.
+// 3. Reads new messages.
+// 4. Stops cleanly when ctx is cancelled.
+func (w *NotificationWorker) Run(// إدارة حياة الـ Worker
+	ctx context.Context,
+) error {
 	if err := w.EnsureConsumerGroup(ctx); err != nil {
 		return err
 	}
 
 	w.logger.Info(
 		"notification worker started",
-		"stream",
-		w.stream,
-		"group",
-		w.group,
-		"consumer",
-		w.consumer,
+		"stream", w.stream,
+		"group", w.group,
+		"consumer", w.consumer,
+		"workers", w.workerCount,
+		"batch_size", w.batchSize,
 	)
 
 	ticker := time.NewTicker(
@@ -499,46 +664,55 @@ func (w *NotificationWorker) Run(ctx context.Context) error {
 			w.logger.Info(
 				"notification worker stopped",
 			)
+
 			return ctx.Err()
 
 		case <-ticker.C:
-			if err := w.reclaimPendingMessages(ctx); err != nil {
-				if errors.Is(err, context.Canceled) {
-					w.logger.Info(
-						"notification worker stopped",
-					)
-					return ctx.Err()
-				}
-
-				w.logger.Error(
-					"failed to reclaim pending messages",
-					"error",
+			if err := w.reclaimPendingMessages(
+				ctx,
+			); err != nil {
+				// Context cancellation during shutdown
+				// is expected and should not be treated
+				// as a real dependency failure.
+				if !errors.Is(
 					err,
-				)
+					context.Canceled,
+				) {
+					w.logger.Error(
+						"failed to reclaim pending messages",
+						"error", err,
+					)
+				}
 			}
 
 		default:
-			if err := w.processNewMessages(ctx); err != nil {
-				if errors.Is(err, context.Canceled) {
-					w.logger.Info(
-						"notification worker stopped",
-					)
+			if err := w.processNewMessages(
+				ctx,
+			); err != nil {
+				if errors.Is(
+					err,
+					context.Canceled,
+				) {
 					return ctx.Err()
 				}
 
 				w.logger.Error(
 					"failed to process new messages",
-					"error",
-					err,
+					"error", err,
 				)
 
+				// Prevent a tight error loop when Redis
+				// or another dependency is unavailable.
+				timer := time.NewTimer(
+					500 * time.Millisecond,
+				) // give app latel time before retry
+
 				select {
-				case <-time.After(500 * time.Millisecond):
 				case <-ctx.Done():
-					w.logger.Info(
-						"notification worker stopped",
-					)
+					timer.Stop()
 					return ctx.Err()
+
+				case <-timer.C:
 				}
 			}
 		}

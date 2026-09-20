@@ -16,6 +16,8 @@ type Config struct {
 	DBPassword string
 	DBName     string
 
+	RedisAddr string
+
 	MaxOpenConns    int
 	MaxIdleConns    int
 	ConnMaxLifetime time.Duration
@@ -38,6 +40,8 @@ func Load() (Config, error) {
 		DBUser:     getEnv("DB_USER", "postgres"),
 		DBPassword: getEnv("DB_PASSWORD", "postgrespassword"),
 		DBName:     getEnv("DB_NAME", "employee_db"),
+
+		RedisAddr: getEnv("REDIS_ADDR", "localhost:6379"),
 
 		RequestTimeout: getEnvDuration(
 			"REQUEST_TIMEOUT",

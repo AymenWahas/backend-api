@@ -85,7 +85,7 @@ func main() {
 	}()
 
 	// Redis
-	redisClient := cache.NewRedis("localhost:6379")
+	redisClient := cache.NewRedis(cfg.RedisAddr)
 
 	if err := redisClient.Ping(ctx); err != nil {
 		slog.Error(

@@ -15,10 +15,18 @@ git status
 git commit -m "implement day12 authorization and security"
 git push -u origin day12-authorization
 
-BEGIN
+|||||||||||||||||||||||||||||||||||||||||||||||
+cd ~/backend-api
 
-INSERT INTO tasks
-INSERT INTO outbox_events
+git status
 
+git switch -c week3-days10-15
 
-COMMIT
+git add .
+
+git status
+
+git commit -m "complete week 3 days 10-15"
+
+git push -u origin week3-days10-15
+
