@@ -1,0 +1,7 @@
+DROP TABLE IF EXISTS tasks;
+DROP TABLE IF EXISTS projects;
+DROP TABLE IF EXISTS employees;
+
+DROP SEQUENCE IF EXISTS tasks_id_seq;
+DROP SEQUENCE IF EXISTS projects_id_seq;
+DROP SEQUENCE IF EXISTS employees_id_seq;
