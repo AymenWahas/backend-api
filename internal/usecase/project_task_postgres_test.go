@@ -50,6 +50,34 @@ func TestPostgresCreateProjectWithTaskRollback(t *testing.T) {
 		t.Fatalf("failed to create test employee: %v", result.Error)
 	}
 
+	// Create a project and task that will be used only to reserve
+	// an existing task ID for the duplicate-key failure.
+	seedProject := &domain.Project{
+		OwnerID:     ownerID,
+		Name:        "Seed Project",
+		Description: "used by transaction rollback test",
+	}
+
+	if err := db.Create(seedProject).Error; err != nil {
+		t.Fatalf("failed to create seed project: %v", err)
+	}
+
+	seedTask := &domain.Task{
+		ProjectID: seedProject.ID,
+		Title:     "Existing Task",
+		Status:    "pending",
+	}
+
+	if err := db.Create(seedTask).Error; err != nil {
+		t.Fatalf("failed to create seed task: %v", err)
+	}
+
+	// Cleanup runs in reverse order:
+	// seed task -> seed project -> test project -> employee.
+	defer db.Exec("DELETE FROM employees WHERE id = ?", ownerID)
+	defer db.Exec("DELETE FROM projects WHERE id = ?", seedProject.ID)
+	defer db.Exec("DELETE FROM tasks WHERE id = ?", seedTask.ID)
+
 	// Create repositories and transaction manager.
 	projectRepo := postgres.NewProjectRepository(db)
 	taskRepo := postgres.NewTaskRepository(db)
@@ -67,14 +95,11 @@ func TestPostgresCreateProjectWithTaskRollback(t *testing.T) {
 		Description: "should rollback",
 	}
 
-	// Cleanup runs in reverse order:
-	// project first, then employee.
-	defer db.Exec("DELETE FROM employees WHERE id = ?", ownerID)
-	defer db.Exec("DELETE FROM projects WHERE id = ?", project.ID)
-
-	// Duplicate task ID will force the task INSERT to fail.
+	// Reuse an existing task ID.
+	// The transaction will try to create another task with this ID,
+	// causing a duplicate primary-key error.
 	task := &domain.Task{
-		ID:     1,
+		ID:     seedTask.ID,
 		Title:  "Duplicate Task",
 		Status: "pending",
 	}
