@@ -12,8 +12,8 @@ import (
 )
 
 type TaskUsecase struct {
-	repo        repository.TaskRepository
-	publisher   event.Publisher
+	repo          repository.TaskRepository
+	publisher     event.Publisher
 	authorization *AuthorizationUsecase
 }
 

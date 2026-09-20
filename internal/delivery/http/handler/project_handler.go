@@ -27,8 +27,7 @@ func NewProjectHandler(
 
 func getUserID(r *http.Request) (int, bool) {
 	userID, ok := r.Context().
-		Value(middleware.UserIDContextKey).
-		(int)
+		Value(middleware.UserIDContextKey).(int)
 
 	return userID, ok
 }
@@ -38,8 +37,7 @@ func (h *ProjectHandler) Create(
 	r *http.Request,
 ) {
 	employeeID, ok := r.Context().
-		Value(middleware.EmployeeIDContextKey).
-		(int)
+		Value(middleware.EmployeeIDContextKey).(int)
 
 	if !ok {
 		response.WriteError(

@@ -221,18 +221,18 @@ func (u *AuthUsecase) Refresh(
 	}, nil
 }
 func (u *AuthUsecase) Logout(
-    ctx context.Context,
-    refreshToken string,
+	ctx context.Context,
+	refreshToken string,
 ) error {
-    tokenHash := auth.HashRefreshToken(refreshToken)
+	tokenHash := auth.HashRefreshToken(refreshToken)
 
-    session, err := u.authSessionRepo.GetByRefreshTokenHash(
-        ctx,
-        tokenHash,
-    )
-    if err != nil {
-        return domain.ErrSessionNotFound
-    }
+	session, err := u.authSessionRepo.GetByRefreshTokenHash(
+		ctx,
+		tokenHash,
+	)
+	if err != nil {
+		return domain.ErrSessionNotFound
+	}
 
-    return u.authSessionRepo.Revoke(ctx, session.ID)
+	return u.authSessionRepo.Revoke(ctx, session.ID)
 }

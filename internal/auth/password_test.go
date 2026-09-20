@@ -1,4 +1,5 @@
 package auth
+
 //gofmt -w internal/auth/password_test.go
 //go test ./internal/auth -v
 import "testing"

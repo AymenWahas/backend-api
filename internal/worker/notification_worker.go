@@ -308,7 +308,7 @@ func (w *NotificationWorker) processMessage(
 // 4. On failure, increment attempts.
 // 5. Retry if attempts < MaxAttempts.
 // 6. Send to DLQ after MaxAttempts.
-func (w *NotificationWorker) handleMessage(//إدارة محاولة واحدة + ACK/Retry/DLQ
+func (w *NotificationWorker) handleMessage( //إدارة محاولة واحدة + ACK/Retry/DLQ
 	ctx context.Context,
 	message redis.XMessage,
 ) error {
@@ -442,7 +442,7 @@ func (w *NotificationWorker) handleMessage(//إدارة محاولة واحدة 
 // sendToDLQ copies the failed message
 // to the dead-letter stream.
 
-func (w *NotificationWorker) sendToDLQ(// = حفظ الرسالة التي فشلت نهائيًا
+func (w *NotificationWorker) sendToDLQ( // = حفظ الرسالة التي فشلت نهائيًا
 	ctx context.Context,
 	message redis.XMessage,
 	attempts int64,
@@ -558,7 +558,7 @@ sendLoop:
 
 // processNewMessages reads new messages
 // from the Redis Stream.
-func (w *NotificationWorker) processNewMessages(//= جلب الرسائل الجديدة
+func (w *NotificationWorker) processNewMessages( //= جلب الرسائل الجديدة
 	ctx context.Context,
 ) error {
 	result, err := w.redis.XReadGroup(
@@ -637,7 +637,7 @@ func (w *NotificationWorker) reclaimPendingMessages( //= استعادة الرس
 // 2. Reclaims abandoned messages.
 // 3. Reads new messages.
 // 4. Stops cleanly when ctx is cancelled.
-func (w *NotificationWorker) Run(// إدارة حياة الـ Worker
+func (w *NotificationWorker) Run( // إدارة حياة الـ Worker
 	ctx context.Context,
 ) error {
 	if err := w.EnsureConsumerGroup(ctx); err != nil {
