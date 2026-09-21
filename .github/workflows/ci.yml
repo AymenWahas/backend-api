@@ -98,6 +98,21 @@ jobs:
           image_name="$(printf '%s' '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')"
           echo "IMAGE_NAME=ghcr.io/${image_name}" >> "$GITHUB_ENV"
 
+      - name: Prepare development TLS certificates
+        shell: bash
+        run: |
+          mkdir -p certs
+
+          openssl req -x509 -newkey rsa:2048 -nodes \
+            -keyout certs/key.pem \
+            -out certs/cert.pem \
+            -days 1 \
+            -subj "/CN=localhost" \
+            -addext "subjectAltName=DNS:localhost,IP:127.0.0.1"
+
+          chmod 600 certs/key.pem
+          chmod 644 certs/cert.pem
+
       - name: Build Docker image
         run: docker build -t "${IMAGE_NAME}:${GITHUB_SHA}" .
 
