@@ -64,6 +64,19 @@ func (h *Handler) Health(
 	)
 }
 
+func (h *Handler) Readiness(
+	w http.ResponseWriter,
+	r *http.Request,
+) {
+	response.WriteJSON(
+		w,
+		http.StatusOK,
+		map[string]string{
+			"status": "ready",
+		},
+	)
+}
+
 func (h *Handler) CreateEmployee(
 	w http.ResponseWriter,
 	r *http.Request,

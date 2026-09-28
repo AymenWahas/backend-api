@@ -1,3 +1,53 @@
+
+	asd
+  asd password
+  {
+  "employee_id": 1,
+  "user_id": 1
+}
+{
+  "name": "asd",
+  "email": "asd@example.com",
+  "department": "cs"
+}
+Response body
+
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoxLCJlbXBsb3llZV9pZCI6MSwiZXhwIjoxNzkwMDk4NDkyLCJpYXQiOjE3OTAwOTc1OTJ9.XBEpBrR4SCxn--UpY2OdfyyGe6f70pcsTCE5d9jT9fU",
+  "refresh_token": "a09477d71a75142cd69c78e74f034034466718baca0feb8c2edb765e96083056"
+}
+===================================================
+
+	{
+  "email": "asd2@example.com",
+  "password": "asd2"
+}
+{
+  "email": "asd2@example.com",
+  "password": "asd2"
+}
+Response body
+
+Response body
+
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoyLCJlbXBsb3llZV9pZCI6MiwiZXhwIjoxNzkwMTc0MzczLCJpYXQiOjE3OTAxNzM0NzN9.r10VVx_z-h77KpNqsBZDwv61dPxTCvv1OIoldjWwONk",
+  "refresh_token": "20e8719d5b662caafada5859c21afee20425d54c9f3d010428fb474105ff92b3"
+}
+-----
+
+
+redis-cli XRANGE task-events - +    get  event
+
+redis-cli XPENDING task-events notifications
+
+
+SELECT id, event_id, message, created_at
+FROM notifications
+WHERE event_id = 'a13c95f1-e139-4cf9-9439-668b5056632a';
+
+----------------------------------------------------------------------------
+
 ayman-wahas@ayman-wahas:~/backend-api$ curl -sk -X POST https://localhost:8443/api/v1/auth/login \ 
   -H "Content-Type: application/json" \
   -d '{

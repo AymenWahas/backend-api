@@ -1,3 +1,31 @@
+1. Docker الانتقال إلى تشغيل المشروع بـ 
+
+Ctrl+C
+
+set -a
+source .env.day16
+set +a
+
+docker compose up -d --build
+
+docker compose ps
+
+curl -k https://localhost:8443/health 
+
+{"status":"ok"}
+___________________________
+2. Docker العودة إلى التشغيل العادي بدون 
+
+docker compose down
+
+unset DB_PASSWORD
+
+export JWT_SECRET=dev-secret-day16
+
+go run ./cmd/api
+
+curl -k https://localhost:8443/health
+
 $$$$$$$$$$$$$$$$
 1-small non-root image 
 $$$$$$$$$$$$$$
@@ -64,3 +92,50 @@ api-1  | {"time":"2026-09-19T19:03:31.598653905Z","level":"INFO","msg":"applicat
 api-1 exited with code 0
 
 
+
+
+-------------------------------------------------------------------------------------------
+الحالة 1: Docker → التشغيل العادي
+
+نفذ بالترتيب:
+docker compose down
+unset DB_PASSWORD
+go run ./cmd/api
+
+وفي Terminal آخر:
+
+curl -k https://localhost:8443/health
+المتوقع:
+
+{"status":"ok"}
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+الحالة 2: التشغيل العادي → Docker
+
+أوقف go run:
+
+Ctrl+C
+
+ثم:
+
+docker compose up -d --build
+
+تحقق:
+
+docker compose ps
+
+ثم:
+
+curl -k https://localhost:8443/health
+
+المتوقع:
+
+{"status":"ok"}
+------------------------------------------------------------------------------------------------
+إذن أوامر التشغيل العادي الصحيحة عندك الآن:
+docker compose down
+unset DB_PASSWORD
+export JWT_SECRET=dev-secret-day16
+go run ./cmd/api
+
+ولا تكتب أي PostgreSQL password.

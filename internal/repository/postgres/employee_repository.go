@@ -42,7 +42,7 @@ func (r *EmployeeRepository) GetByEmail(
 		First(&employee)
 
 	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-		return domain.Employee{}, domain.ErrEmployeeNotFound
+		return domain.Employee{}, repository.ErrEmployeeNotFound
 	}
 
 	if result.Error != nil {
@@ -77,7 +77,7 @@ func (r *EmployeeRepository) GetByID(
 		First(&employee)
 
 	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-		return domain.Employee{}, domain.ErrEmployeeNotFound
+		return domain.Employee{}, repository.ErrEmployeeNotFound
 	}
 
 	if result.Error != nil {
@@ -170,7 +170,7 @@ func (r *EmployeeRepository) Update(
 	}
 
 	if result.RowsAffected == 0 {
-		return domain.Employee{}, domain.ErrEmployeeNotFound
+		return domain.Employee{}, repository.ErrEmployeeNotFound
 	}
 
 	return r.GetByID(ctx, employee.ID)
@@ -189,7 +189,7 @@ func (r *EmployeeRepository) Delete(
 	}
 
 	if result.RowsAffected == 0 {
-		return domain.ErrEmployeeNotFound
+		return repository.ErrEmployeeNotFound
 	}
 
 	return nil

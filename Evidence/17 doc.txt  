@@ -1,0 +1,655 @@
+# Day 17 — Deployment Strategies and Architecture
+
+## 1. Deployment
+
+Deployment هو عملية نقل الـ application الذي تم بناؤه واختباره إلى بيئة التشغيل الفعلية.
+
+في مشروع `backend-api` يكون المسار العام:
+
+```text
+Developer
+    ↓
+Git Commit
+    ↓
+GitHub
+    ↓
+GitHub Actions
+    ↓
+Docker Image
+    ↓
+GitHub Container Registry (GHCR)
+    ↓
+Production Server
+    ↓
+Docker Compose
+    ├── backend-api
+    ├── PostgreSQL
+    └── Redis
+```
+
+في مشروعنا تم تنفيذ مرحلة CI وبناء Docker Image ودفعها إلى GHCR.
+
+أما تشغيل الـ Image على Production Server فهو جزء من خطة الـ Deployment وليس Deployment فعليًا على Cloud في هذا التدريب.
+
+---
+
+# 2. Rolling Deployment
+
+Rolling Deployment يعني تحديث الـ application تدريجيًا بدل إيقاف جميع النسخ في نفس الوقت.
+
+مثال:
+
+لدينا 3 نسخ من `backend-api`:
+
+```text
+Server
+├── API v1
+├── API v1
+└── API v1
+```
+
+نقوم بتحديث نسخة واحدة:
+
+```text
+Server
+├── API v2
+├── API v1
+└── API v1
+```
+
+إذا كانت النسخة الجديدة تعمل بشكل صحيح، نحدث النسخة الثانية ثم الثالثة:
+
+```text
+Server
+├── API v2
+├── API v2
+└── API v2
+```
+
+الميزة الأساسية هي تقليل وقت التوقف أثناء عملية التحديث.
+
+**في مشروع `backend-api`:**
+
+لم نقم بتنفيذ Rolling Deployment فعليًا، وإنما نستخدمه كاستراتيجية موثقة يمكن تطبيقها عند تشغيل عدة replicas من الـ API.
+
+---
+
+# 3. Blue-Green Deployment
+
+في Blue-Green Deployment نحتفظ ببيئتين:
+
+```text
+Blue  → الإصدار الحالي
+Green → الإصدار الجديد
+```
+
+مثلاً:
+
+```text
+                Load Balancer
+                      |
+             ┌────────┴────────┐
+             ↓                 ↓
+          Blue              Green
+          v1                 v2
+```
+
+في البداية يكون المستخدمون متصلين بـ Blue.
+
+نقوم بتشغيل Green بالإصدار الجديد واختباره.
+
+إذا نجح الاختبار، يتم تحويل الـ traffic إلى Green:
+
+```text
+Users
+  ↓
+Green v2
+```
+
+إذا حدثت مشكلة، يمكن إعادة الـ traffic إلى Blue:
+
+```text
+Users
+  ↓
+Blue v1
+```
+
+وهذا يجعل عملية Rollback سريعة.
+
+**في مشروع `backend-api`:**
+
+لم ننفذ Blue-Green Deployment فعليًا، وإنما تم توثيقها كاستراتيجية Deployment.
+
+---
+
+# 4. Canary Deployment
+
+Canary Deployment يعني إرسال نسبة صغيرة من المستخدمين إلى الإصدار الجديد أولًا.
+
+مثلاً:
+
+```text
+Users
+  |
+  +---- 95% ----> API v1
+  |
+  +----- 5% ----> API v2
+```
+
+نراقب الإصدار الجديد:
+
+* Errors
+* Response latency
+* CPU
+* Memory
+* Application logs
+* Metrics
+
+إذا كان الإصدار الجديد يعمل بشكل جيد، يمكن زيادة النسبة:
+
+```text
+90% → v1
+10% → v2
+
+ثم:
+
+50% → v1
+50% → v2
+
+ثم:
+
+0% → v1
+100% → v2
+```
+
+إذا ظهرت مشكلة، يتم إيقاف إرسال traffic إلى v2.
+
+**في مشروع `backend-api`:**
+
+لم ننفذ Canary Deployment فعليًا.
+
+---
+
+# 5. Rollback
+
+Rollback يعني الرجوع إلى إصدار سابق معروف أنه يعمل بشكل صحيح.
+
+في مشروعنا نستخدم Commit SHA كـ Docker image tag.
+
+مثال:
+
+```text
+ghcr.io/aymenwahas/backend-api:d20683e
+```
+
+إذا كان هذا الإصدار يعمل بشكل صحيح، ثم تم إنشاء إصدار جديد:
+
+```text
+ghcr.io/aymenwahas/backend-api:a82f921
+```
+
+وكان الإصدار الجديد يحتوي على مشكلة، يمكن الرجوع إلى:
+
+```text
+ghcr.io/aymenwahas/backend-api:d20683e
+```
+
+لأن كل Image مرتبطة بـ Commit محدد.
+
+المسار يكون:
+
+```text
+New Image
+    ↓
+Deploy
+    ↓
+Health Check
+    ↓
+Problem detected
+    ↓
+Rollback
+    ↓
+Previous Image
+```
+
+هذه الطريقة أفضل من الاعتماد على `latest` فقط، لأن `latest` لا يخبرنا بشكل واضح أي Commit تم تشغيله.
+
+---
+
+# 6. Database Migration Sequencing
+
+تحديث الـ application قد يتطلب تغيير Database Schema.
+
+لذلك يجب ترتيب Migration وDeployment بعناية.
+
+نستخدم مبدأ:
+
+```text
+Expand
+   ↓
+Migrate
+   ↓
+Deploy
+   ↓
+Contract
+```
+
+### Expand
+
+نضيف التغيير الجديد بطريقة لا تكسر الإصدار القديم.
+
+مثلاً نضيف column جديد:
+
+```text
+new_column
+```
+
+لكن لا نحذف الـ column القديم بعد.
+
+### Migrate
+
+نقوم بنقل أو تجهيز البيانات المطلوبة.
+
+### Deploy
+
+ننشر إصدار API الجديد الذي يستطيع استخدام التغيير الجديد.
+
+### Contract
+
+بعد التأكد أن جميع النسخ أصبحت تستخدم الـ schema الجديد، يمكن إزالة الأشياء القديمة في Release لاحق.
+
+---
+
+## لماذا لا نعتمد على Rollback للـ Database بنفس سهولة Rollback للـ Application؟
+
+لأننا نستطيع بسهولة تشغيل:
+
+```text
+API v1
+```
+
+بدل:
+
+```text
+API v2
+```
+
+لكن إذا قام v2 بتغيير Database بطريقة غير قابلة للعكس، فإن إعادة API إلى v1 لا تعيد Database تلقائيًا إلى حالتها السابقة.
+
+لذلك يجب تصميم Database migrations بحيث تكون متوافقة مع الإصدار القديم والجديد قدر الإمكان.
+
+في مشروع `backend-api` توجد migrations تحت:
+
+```text
+migrations/
+```
+
+ويتم تشغيل migrations في CI قبل اختبار التطبيق.
+
+---
+
+# 7. Feature Flags
+
+Feature Flag هي طريقة للتحكم في تشغيل Feature بدون الحاجة إلى نشر إصدار جديد كل مرة.
+
+مثلاً:
+
+```text
+new_notification_system = false
+```
+
+يتم نشر الكود، لكن الـ feature تكون متوقفة.
+
+بعد التأكد أن الإصدار يعمل:
+
+```text
+new_notification_system = true
+```
+
+فتصبح الـ feature فعالة.
+
+الفائدة:
+
+```text
+Deploy code
+    ↓
+Keep feature disabled
+    ↓
+Test / Monitor
+    ↓
+Enable feature
+```
+
+وهذا يقلل المخاطر عند إطلاق Features كبيرة.
+
+**في مشروع `backend-api`:**
+
+لم ننفذ Feature Flag system فعليًا؛ تم توثيق المفهوم فقط.
+
+---
+
+# 8. Deployment Architecture المختارة
+
+لأغراض التدريب، البيئة المختارة هي:
+
+```text
+Linux Server
+     |
+     ↓
+Docker Compose
+     |
+     ├── backend-api
+     |
+     ├── PostgreSQL
+     |
+     └── Redis
+```
+
+والـ API image تأتي من:
+
+```text
+GitHub Container Registry
+```
+
+والتدفق الكامل:
+
+```text
+Developer
+    |
+    | git commit
+    ↓
+GitHub
+    |
+    | push
+    ↓
+GitHub Actions
+    |
+    ├── Format
+    ├── Vet
+    ├── Tests
+    ├── Race Tests
+    ├── Build
+    ├── Vulnerability Check
+    └── Docker Build
+            |
+            ↓
+          GHCR
+            |
+            ↓
+     Production Server
+            |
+            ↓
+       Docker Compose
+            |
+      ┌─────┼─────┐
+      ↓     ↓     ↓
+     API   DB   Redis
+```
+
+---
+
+# 9. Deployment Status في مشروع backend-api
+
+## Implemented
+
+تم تنفيذ:
+
+* GitHub Actions CI
+* Formatting check
+* Static analysis
+* Unit/integration tests
+* Race tests
+* Vulnerability checking
+* Docker image build
+* Image tagging باستخدام Commit SHA
+* Push إلى GHCR
+* Migration execution داخل CI
+
+## Documented Only
+
+تم توثيق:
+
+* Rolling Deployment
+* Blue-Green Deployment
+* Canary Deployment
+* Rollback
+* Database Migration Sequencing
+* Feature Flags
+* Deployment Architecture
+
+هذه الاستراتيجيات **لم يتم تنفيذها فعليًا في Production**، وإنما تم فهمها ووضع خطة لاستخدامها.
+
+---
+
+# 10. Main Deployment Principle
+
+الهدف من هذه الاستراتيجيات هو جعل عملية النشر:
+
+```text
+Repeatable
+      +
+Observable
+      +
+Reversible
+```
+
+أي:
+
+**Repeatable:** نستطيع إعادة عملية النشر بنفس الخطوات.
+
+**Observable:** نستطيع معرفة هل الإصدار يعمل أم لا من خلال Health Checks وLogs وMetrics.
+
+**Reversible:** نستطيع الرجوع إلى Image سابقة معروفة باستخدام Commit SHA إذا حدثت مشكلة.
+#######################################################################################################3
+
+############################################################################################################
+# Deployment and Rollback Plan
+
+## 1. Chosen Environment
+
+The chosen deployment environment is a Linux server running Docker and Docker Compose.
+
+The application is deployed as a Docker container, while PostgreSQL and Redis run as separate containers managed by Docker Compose.
+
+The deployment architecture is:
+
+Developer
+↓
+GitHub
+↓
+GitHub Actions
+↓
+Docker Image
+↓
+GitHub Container Registry (GHCR)
+↓
+Linux Production Server
+↓
+Docker Compose
+├── backend-api
+├── PostgreSQL
+└── Redis
+
+The Docker image is tagged with the Git commit SHA, for example:
+
+ghcr.io/aymenwahas/backend-api:d20683e
+
+Using the commit SHA makes each application version identifiable and immutable.
+
+---
+
+## 2. Deployment Plan
+
+When a new version of the application is ready, the deployment follows these steps:
+
+### Step 1 - Create a Git Commit
+
+A developer changes the application code and creates a Git commit.
+
+The commit receives a unique SHA.
+
+Example:
+
+d20683e
+
+### Step 2 - CI Pipeline
+
+The GitHub Actions workflow is triggered by the push.
+
+The pipeline performs:
+
+* Formatting check
+* Static analysis
+* Unit/integration tests
+* Race tests
+* Application build
+* Vulnerability check
+* Docker image build
+
+If the checks fail, the deployment stops.
+
+If all checks pass, the Docker image is pushed to GHCR.
+
+---
+
+## 3. Database Migration Sequence
+
+Database migrations must be handled carefully because the application and database must remain compatible during deployment.
+
+The preferred sequence is:
+
+1. Create a backward-compatible database migration.
+2. Run the migration.
+3. Deploy the new application image.
+4. Start the new application version.
+5. Perform a health check.
+6. Confirm that the application is operating correctly.
+
+For schema changes that may affect both old and new application versions, use the:
+
+Expand → Migrate → Contract
+
+approach.
+
+### Expand
+
+Add the new database structure without immediately removing the old structure.
+
+### Migrate
+
+Deploy application code that can use the new structure and migrate existing data if required.
+
+### Contract
+
+After the old application version is no longer needed, remove the old database structure.
+
+This approach reduces the risk of an application rollback becoming incompatible with the database.
+
+---
+
+## 4. Application Deployment
+
+After the migration succeeds, the production server pulls the required immutable image from GHCR.
+
+For example:
+
+ghcr.io/aymenwahas/backend-api:d20683e
+
+Docker Compose then starts the application using that image.
+
+The deployment should verify:
+
+* Container starts successfully.
+* Application can connect to PostgreSQL.
+* Application can connect to Redis.
+* `/health` returns a successful response.
+* Logs do not show startup failures.
+* The application is serving requests correctly.
+
+Only after these checks pass is the deployment considered successful.
+
+---
+
+## 5. Rollback Plan
+
+Rollback is used when the newly deployed application version has a serious problem.
+
+Before deployment, the currently running image version should be recorded.
+
+Example:
+
+Current version:
+
+ghcr.io/aymenwahas/backend-api:a82f921
+
+New version:
+
+ghcr.io/aymenwahas/backend-api:d20683e
+
+If the new version fails its health checks or causes a serious application problem, the deployment is rolled back to the previous known-good image:
+
+ghcr.io/aymenwahas/backend-api:a82f921
+
+Docker Compose is then restarted using the previous image.
+
+After rollback, the following checks are performed:
+
+1. Container starts successfully.
+2. `/health` returns successfully.
+3. PostgreSQL connectivity is working.
+4. Redis connectivity is working.
+5. Application logs are checked.
+6. A basic API request is tested.
+
+---
+
+## 6. Important Database Rollback Rule
+
+Application rollback and database rollback are not the same thing.
+
+Reverting the Docker image does not automatically revert database changes.
+
+For this reason, production migrations should preferably be backward-compatible.
+
+Destructive database changes should not be introduced in a way that makes the previous application version unable to work with the new schema.
+
+For example:
+
+Bad approach:
+
+1. Delete old database column.
+2. Deploy new application.
+3. New application fails.
+4. Roll back application.
+
+The old application may require the deleted column and therefore may also fail.
+
+Safer approach:
+
+1. Add the new column.
+2. Deploy code that supports the new column.
+3. Migrate data.
+4. Verify the new version.
+5. Remove the old column only in a later release.
+
+---
+
+## 7. Deployment Failure Conditions
+
+The deployment should be considered unsuccessful if:
+
+* Docker container fails to start.
+* Health check fails.
+* Database connection fails.
+* Redis connection fails.
+* Application repeatedly crashes.
+* Critical API requests fail.
+* Critical errors appear in application logs.
+
+When a critical failure occurs, stop the rollout and use the rollback procedure.
+
+---
+
+## 8. Version Tracking
+
+Every deployed applicat

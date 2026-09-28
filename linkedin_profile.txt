@@ -1,0 +1,46 @@
+Name:
+Ayman Mohammad Ahmad Wahas
+
+Phone:
++966 770656753
+
+Email:
+aymenwahas@gmail.com
+
+Address:
+Sana’a, Yemen
+
+Headline:
+Backend Developer | Go Developer | Laravel Developer | API Developer | PostgreSQL | Redis | Docker
+
+Professional Summary:
+Backend Developer with experience in building secure, scalable, and high-performance web applications using Go and Laravel. Skilled in developing REST APIs, implementing authentication and authorization, integrating databases, and designing reliable backend systems for business operations.
+
+I have hands-on experience with PostgreSQL, Redis, Docker, JWT, middleware, background job processing, and production-ready backend architecture. I am passionate about clean code, maintainability, performance optimization, and solving real-world technical problems with practical and efficient solutions.
+
+Experience:
+Backend Developer
+
+- Developed and maintained backend systems using Go and Laravel for business applications and APIs
+- Built RESTful APIs for data management and business processes
+- Implemented authentication, authorization, and secure request handling with JWT and middleware
+- Integrated PostgreSQL for data persistence and Redis for caching and async workflows
+- Designed and managed Docker-based environments for local deployment and service orchestration
+- Worked with background workers and event-driven processing for notifications and asynchronous tasks
+- Improved application reliability through validation, error handling, testing, and health checks
+- Collaborated on scalable backend architecture and production-ready system design
+
+Technical Skills:
+Go, Laravel, PHP, REST APIs, PostgreSQL, Redis, Docker, Docker Compose, JWT, Middleware, API Security, Authentication, Authorization, Background Jobs, Git, GitHub, Linux
+
+Education:
+Bachelor’s Degree, University of Science and Technology, 2024
+
+Training & Certifications:
+Savafon Academy Training Certificate
+
+Additional Information:
+- Strong understanding of backend architecture and API design
+- Experience working with databases, caching, and deployment tools
+- Focused on clean code, maintainability, and production-ready systems
+- Interested in backend development, software engineering, and continuous learning

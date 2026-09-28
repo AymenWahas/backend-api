@@ -74,8 +74,11 @@ func TestPostgresCreateProjectWithTaskRollback(t *testing.T) {
 
 	// Cleanup runs in reverse order:
 	// seed task -> seed project -> test project -> employee.
+	
 	defer db.Exec("DELETE FROM employees WHERE id = ?", ownerID)
+	
 	defer db.Exec("DELETE FROM projects WHERE id = ?", seedProject.ID)
+	
 	defer db.Exec("DELETE FROM tasks WHERE id = ?", seedTask.ID)
 
 	// Create repositories and transaction manager.

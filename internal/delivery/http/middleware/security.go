@@ -11,17 +11,17 @@ import (
 // SecurityHeaders adds a minimal secure headers set to all responses.
 func SecurityHeaders(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("X-Content-Type-Options", "nosniff")
-		w.Header().Set("X-Frame-Options", "DENY")
-		w.Header().Set("Referrer-Policy", "no-referrer")
-		w.Header().Set("X-XSS-Protection", "1; mode=block")
-		w.Header().Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+		w.Header().Set("X-Content-Type-Options", "nosniff")                                //header to respone contype
+		w.Header().Set("X-Frame-Options", "DENY")                                          // no iframe  to page
+		w.Header().Set("Referrer-Policy", "no-referrer")                                   //dont send addr page on refrerer header
+		w.Header().Set("X-XSS-Protection", "1; mode=block")                                //old brwser
+		w.Header().Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains") //for 1 year use https
 		next.ServeHTTP(w, r)
 	})
 }
 
 // RequestSizeLimit rejects oversized request bodies to reduce abuse.
-func RequestSizeLimit(maxBytes int64) func(http.Handler) http.Handler {
+func RequestSizeLimit(maxBytes int64) func(http.Handler) http.Handler { //byte of data int64
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if r.ContentLength > maxBytes {
@@ -88,15 +88,17 @@ func RateLimit(limit int, window time.Duration) func(http.Handler) http.Handler 
 // CORS allows only trusted origins and keeps browser-facing APIs conservative.
 func CORS(allowedOrigins string) func(http.Handler) http.Handler {
 	origins := strings.Split(allowedOrigins, ",")
+
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+
 			origin := r.Header.Get("Origin")
 			for _, allowed := range origins {
 				if strings.TrimSpace(allowed) == "*" || strings.TrimSpace(allowed) == origin {
 					w.Header().Set("Access-Control-Allow-Origin", origin)
-					w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+					w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS") //brwser send before real req
 					w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
-					w.Header().Set("Access-Control-Max-Age", "600")
+					w.Header().Set("Access-Control-Max-Age", "600")//broser store result req  600 second
 					break
 				}
 			}
@@ -111,7 +113,7 @@ func CORS(allowedOrigins string) func(http.Handler) http.Handler {
 	}
 }
 
-// Validation helper for common request abuse checks.
+// Validation helper for data request abuse checks.
 func ValidateIdentifier(value string, fieldName string, maxLen int) error {
 	trimmed := strings.TrimSpace(value)
 	if trimmed == "" {

@@ -1,0 +1,42 @@
+
+\\\\\\\\\\\\\
+api local -- 8443 \\ docker compose stop api اوقف الدوكر اولا 
+\\\\\\\\\\\\\\
+ export JWT_SECRET='dev-secret-day17'
+ export DB_HOST=localhost 
+ export DB_PORT=55432
+ go run ./cmd/api
+  
+  curl -k https://localhost:8443/health 
+
+
+\\\\\\\\\--------------------------------------------
+LOCAL
+─────
+Ctrl+C
+    ↓
+docker compose up -d
+    ↓
+docker compose ps
+    ↓
+curl -k https://localhost:8443/health
+
+إذا كان هناك تغيير في الكود
+
+Ctrl+C
+   ↓
+docker compose up -d --build
+   ↓
+docker compose ps
+   ↓
+curl -k https://localhost:8443/health
+
+------------------------------------------------
+curl -k https://localhost:8443/ready
+
+curl -k https://localhost:8443/readiness
+
+migrate -path=./migrations -database="postgres://postgres:postgrespassword@localhost:55432/employee_db?sslmode=disable" up
+
+
+migrate -path=/migrations -database=... up

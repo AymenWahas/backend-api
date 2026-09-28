@@ -482,7 +482,7 @@ func (w *NotificationWorker) sendToDLQ( // = حفظ الرسالة التي فش
 // WorkerCount = 3
 //
 // At most 3 goroutines process messages concurrently.
-func (w *NotificationWorker) processBatch( // BatchSize   = for msg 10 توزيع العمل على goroutines
+func (w *NotificationWorker) processBatch( // concurrency BatchSize  = for msg 10 توزيع العمل على goroutines
 	ctx context.Context,
 	messages []redis.XMessage,
 ) error {
@@ -521,11 +521,7 @@ func (w *NotificationWorker) processBatch( // BatchSize   = for msg 10 توزي�
 						ctx,
 						message,
 					); err != nil {
-						// A message-level failure is not a
-						// batch-level failure.
-						//
-						// The message remains pending and
-						// can be recovered by XAUTOCLAIM.
+
 						w.logger.Warn(
 							"message processing failed; message remains pending",
 							"worker_id", workerID,

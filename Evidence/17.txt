@@ -1,0 +1,264 @@
+ls -la .github/workflows
+***************
+1. CI Workflow   The CI workflow is located at: .github/workflows/ci.yml
+*********************8
+Push
+ ↓
+gofmt
+ ↓
+go vet
+ ↓
+migrations
+ ↓
+go test
+ ↓
+go test -race
+ ↓
+go build
+ ↓
+govulncheck
+ ↓
+Docker build
+ ↓
+Docker push
+
+The Docker image is tagged using the Git commit SHA.
+
+1. Passing pipeline 
+GitHub Actions Run #7 نجح.
+
+#############################################3###############################################################
+2. Immutable artifact 
+#################################################################################################
+Docker Image مرتبطة بـ Commit SHA:
+
+جعلنا الـ Image مرتبطة بالـ Commit
+
+ghcr.io/aymenwahas/backend-api:d20683e
+
+
+ghcr.io
+   ↓
+مكان تخزين الصورة
+
+aymenwahas/backend-api
+   ↓
+اسم مشروعنا
+
+d20683e
+   ↓
+Commit الذي بُنيت منه الصورة
+
+النتيجة:
+ghcr.io/aymenwahas/backend-api:d20683e
+
+This provides an immutable reference
+ to the application version that was built from that commit.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+5. Database Migration Plan
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+Database migrations must be performed in a way that keeps the application 
+compatible with the database.
+
+The preferred sequence is:
+
+Backward-compatible migration
+          ↓
+Run migration
+          ↓
+Deploy new application
+          ↓
+Health check
+          ↓
+Verify application
+
+For larger schema changes, the recommended approach is:
+
+Expand
+  ↓
+Migrate
+  ↓
+Contract
+
+The database should not be changed in a destructive way 
+that makes rollback of the application impossible.
+
+Application rollback and database rollback are treated as separate concerns.
+
+###############################################################################################
+4. Rollback Plan
+############################################################################################
+The deployment and rollback flow is:
+
+                 CI
+                 ↓
+          Docker Image
+                 ↓
+                GHCR
+                 ↓
+             Deployment
+                 ↓
+             /health
+             /     \
+           OK       FAIL
+           ↓          ↓
+       Keep v2    Rollback
+                     ↓
+                    v1
+
+If the new application version fails its health check
+ or has a critical problem, the deployment should be rolled back 
+ to the previous known-good Docker image.
+
+For example:
+
+Previous version:
+ghcr.io/aymenwahas/backend-api:a82f921
+
+New version:
+ghcr.io/aymenwahas/backend-api:d20683e
+
+If the new version fails:
+
+d20683e
+   ↓
+Failure
+   ↓
+Rollback
+   ↓
+a82f921
+
+The previous image is used because it represents the 
+last known-good application version.
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+5.Architecture Diagram
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+_________________________
+                         Developer
+                            │
+                            │ git push
+                            ▼
+                         GitHub
+                            │
+                            │ triggers
+                            ▼
+                    ┌─────────────────┐
+                    │ GitHub Actions  │
+                    │      CI         │
+                    └────────┬────────┘
+                             │
+              ┌──────────────┼──────────────┐
+              │              │              │
+              ▼              ▼              ▼
+           gofmt          go vet        go test
+                                             │
+                                      go test -race
+                                             │
+              ┌──────────────────────────────┘
+              │
+              ▼
+       govulncheck + Build
+              │
+              ▼
+        Docker Image
+              │
+              │ tag = Git SHA
+              ▼
+     ┌──────────────────────┐
+     │         GHCR         │
+     │ Docker Image Registry│
+     └──────────┬───────────┘
+                │
+                │ pull image
+                ▼
+       ┌────────────────────┐
+       │    Linux Server    │
+       │   Docker Compose   │
+       └─────────┬──────────┘
+                 │
+        ┌────────┼────────┐
+        │        │        │
+        ▼        ▼        ▼
+   backend-api PostgreSQL Redis
+        │
+        │
+        ▼
+     /health
+        │
+    ┌───┴────┐
+    │        │
+    ▼        ▼
+   OK      FAIL
+    │        │
+    ▼        ▼
+ Keep     Rollback
+ new        │
+ version    ▼
+          Previous
+          SHA Image
+__________________________________________
+
+ Deployment Architecture
+
+## 1. Environment
+
+Chosen environment:
+
+- Linux server
+- Docker Compose
+- GitHub Actions for CI
+- GitHub Container Registry (GHCR) for Docker images
+- PostgreSQL
+- Redis
+
+Architecture:
+
+text
+Developer
+    |
+    v
+GitHub
+    |
+    v
+GitHub Actions
+    |
+    +--> Format
+    +--> Static Analysis
+    +--> Tests
+    +--> Race Tests
+    +--> Build
+    +--> Vulnerability Check
+    +--> Docker Image
+    |
+    v
+GHCR
+    |
+    | immutable image tagged with commit SHA
+    v
+Linux Server
+    |
+    +--> backend-api
+    +--> PostgreSQL
+    +--> Redis
+  &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+  Rollback
+                    CI
+                 ↓
+          Docker Image
+                 ↓
+                GHCR
+                 ↓
+             Deployment
+                 ↓
+             /health
+             /     \
+           OK       FAIL
+           ↓          ↓
+       Keep v2    Rollback
+                     ↓
+                    v1
+
+                    If the new application version fails its health check or has a critical problem,
+                     the deployment should be rolled back to the previous known-good Docker image.
