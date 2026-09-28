@@ -213,8 +213,6 @@ func NewRouter(
 		promhttp.Handler(),
 	)
 
-	
-
 	// API
 	mux.Handle(
 		"/",
@@ -244,45 +242,45 @@ func NewRouter(
 		"/swagger/",
 		swaggerHandler,
 	)
-// Global middleware for the application routes.
-apiHandler := middleware.SecurityHeaders(
-    middleware.CORS(allowedOrigins)(
-        middleware.RateLimit(
-            20,
-            time.Minute,
-        )(
-            middleware.RequestSizeLimit(
-                1 << 20,
-            )(
-                middleware.RequestID(
-                    middleware.Recovery(
-                        middleware.RequestLogger(
-                            middleware.Timeout(
-                                requestTimeout,
-                            )(mux),
-                        ),
-                    ),
-                ),
-            ),
-        ),
-    ),
-)
+	// Global middleware for the application routes.
+	apiHandler := middleware.SecurityHeaders(
+		middleware.CORS(allowedOrigins)(
+			middleware.RateLimit(
+				20,
+				time.Minute,
+			)(
+				middleware.RequestSizeLimit(
+					1 << 20,
+				)(
+					middleware.RequestID(
+						middleware.Recovery(
+							middleware.RequestLogger(
+								middleware.Timeout(
+									requestTimeout,
+								)(mux),
+							),
+						),
+					),
+				),
+			),
+		),
+	)
 
-// Keep pprof outside the application timeout and rate limit.
-// This is for local performance profiling only.
-pprofMux := http.NewServeMux()
+	// Keep pprof outside the application timeout and rate limit.
+	// This is for local performance profiling only.
+	pprofMux := http.NewServeMux()
 
-pprofMux.Handle("/", apiHandler)
-pprofMux.HandleFunc("/debug/pprof/", pprof.Index)
-pprofMux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
-pprofMux.HandleFunc("/debug/pprof/profile", pprof.Profile)
-pprofMux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
-pprofMux.HandleFunc("/debug/pprof/trace", pprof.Trace)
-pprofMux.Handle("/debug/pprof/goroutine", pprof.Handler("goroutine"))
-pprofMux.Handle("/debug/pprof/heap", pprof.Handler("heap"))
-pprofMux.Handle("/debug/pprof/threadcreate", pprof.Handler("threadcreate"))
-pprofMux.Handle("/debug/pprof/block", pprof.Handler("block"))
-pprofMux.Handle("/debug/pprof/mutex", pprof.Handler("mutex"))
+	pprofMux.Handle("/", apiHandler)
+	pprofMux.HandleFunc("/debug/pprof/", pprof.Index)
+	pprofMux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
+	pprofMux.HandleFunc("/debug/pprof/profile", pprof.Profile)
+	pprofMux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+	pprofMux.HandleFunc("/debug/pprof/trace", pprof.Trace)
+	pprofMux.Handle("/debug/pprof/goroutine", pprof.Handler("goroutine"))
+	pprofMux.Handle("/debug/pprof/heap", pprof.Handler("heap"))
+	pprofMux.Handle("/debug/pprof/threadcreate", pprof.Handler("threadcreate"))
+	pprofMux.Handle("/debug/pprof/block", pprof.Handler("block"))
+	pprofMux.Handle("/debug/pprof/mutex", pprof.Handler("mutex"))
 
-return pprofMux
+	return pprofMux
 }
